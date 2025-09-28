@@ -1,0 +1,116 @@
+# Cursor AI Development Rules for Document Service
+
+## Test-Driven Development (TDD) Rules
+
+### E2E Test Defect Resolution Process
+When any defect is discovered through E2E tests:
+
+1. **NEVER fix the defect directly**
+2. **ALWAYS follow TDD approach:**
+   - First, write a **lower-level test** (unit or integration) that reproduces the defect
+   - Ensure the test **FAILS** (red phase)
+   - Only then implement the **fix** to make the test pass (green phase)
+   - **Refactor** if needed (refactor phase)
+
+3. **Test Level Priority:**
+   - **Unit tests** for business logic, utilities, and individual functions
+   - **Integration tests** for service interactions, database operations, API endpoints
+   - **E2E tests** for complete user workflows only
+
+4. **Test Coverage Requirements:**
+   - Before fixing any defect: **Write auto-test to reproduce it**
+   - Before refactoring any module: **Ensure at least 80% test coverage**
+   - After implementing new features: **Write comprehensive tests**
+
+### Testing Infrastructure Rules
+
+1. **No Mocking for External Services:**
+   - Do NOT mock Cosmos DB, Blob Storage, or SQS
+   - Use local emulators for these services
+   - Maintain test environment parity with production
+
+2. **Integration Test Rules:**
+   - **NEVER mock databases, blob storage, or message queues in integration tests**
+   - **ALWAYS use testcontainers for PostgreSQL, Azure Blob Storage (Azurite), Azure Storage Queues (Azurite)**
+   - **Integration tests MUST test real service interactions**
+   - **Only mock external APIs that are not under test**
+   - **Use real document service, storage service, and database repositories**
+   - **Use Azure Storage Queues for event publishing (not Service Bus)**
+   - **Use Azurite testcontainer for Azure Storage Queues in integration tests**
+
+3. **Pre-commit Hook Requirements:**
+   - Pre-commit hooks MUST run all tests
+   - Pre-commit hooks MUST fail if any test fails
+   - NEVER use `--no-verify` flag on git commits
+   - NEVER disable pre-commit hooks
+
+4. **Git Workflow Rules:**
+   - NEVER delete 'develop' branch during merges
+   - After commit to develop: **Watch GitHub Actions until successful completion**
+   - All tests must pass before merging
+
+### Code Quality Standards
+
+1. **Authentication & Security:**
+   - Use Auth0 for authentication (not Supabase)
+   - Always validate JWT tokens properly
+   - Test authentication flows thoroughly
+
+2. **Error Handling:**
+   - Write tests for error scenarios first
+   - Implement proper error responses
+   - Log errors appropriately
+
+3. **Database Operations:**
+   - Test database operations with real database (not mocks)
+   - Use transactions where appropriate
+   - Handle UUID types correctly
+
+4. **Database Technology Rules:**
+   - **NEVER use SQLite** for any database operations
+   - **ALWAYS use PostgreSQL** for all database operations
+   - **Use testcontainers with PostgreSQL** for integration tests
+   - **PostgreSQL-specific features** (JSONB, UUID, etc.) are required and expected
+   - **SQLite compatibility is NOT a concern** - optimize for PostgreSQL
+
+### Development Workflow
+
+1. **Feature Development:**
+   ```
+   Write failing test → Implement feature → Make test pass → Refactor → Commit
+   ```
+
+2. **Bug Fixes:**
+   ```
+   Reproduce with test → Verify test fails → Fix bug → Verify test passes → Commit
+   ```
+
+3. **Refactoring:**
+   ```
+   Ensure test coverage ≥80% → Refactor → Verify all tests pass → Commit
+   ```
+
+### Testing Commands
+
+```bash
+# Run all tests
+uv run pytest
+
+# Run with coverage
+uv run pytest --cov=. --cov-report=html
+
+# Run E2E tests
+uv run pytest tests/e2e/ --env local -v
+
+# Run specific test types
+uv run pytest tests/unit/ -v
+uv run pytest tests/integration/ -v
+```
+
+### Enforcement
+
+- **AI Assistant MUST follow these rules**
+- **No exceptions without explicit user approval**
+- **Always mention TDD approach when fixing defects**
+- **Suggest appropriate test level for each issue**
+

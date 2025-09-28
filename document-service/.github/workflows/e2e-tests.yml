@@ -1,0 +1,268 @@
+name: E2E Tests
+
+on:
+  # Run on schedule (every 6 hours)
+  schedule:
+    - cron: '0 */6 * * *'
+  
+  # Allow manual triggering
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to test'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+      test_markers:
+        description: 'Test markers to run'
+        required: true
+        default: 'smoke'
+        type: choice
+        options:
+          - smoke
+          - critical
+          - full
+  
+  # Run on pull requests to main
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'main.py'
+      - 'routers/**'
+      - 'services/**'
+      - 'models/**'
+      - 'tests/e2e/**'
+
+jobs:
+  e2e-local:
+    name: E2E Tests (Local)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    
+    services:
+      postgres:
+        image: pgvector/pgvector:pg15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: resumematch
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      minio:
+        image: minio/minio:latest
+        env:
+          MINIO_ROOT_USER: minioadmin
+          MINIO_ROOT_PASSWORD: minioadmin
+        options: >-
+          --health-cmd "curl -f http://localhost:9000/minio/health/live"
+          --health-interval 30s
+          --health-timeout 20s
+          --health-retries 3
+        ports:
+          - 9000:9000
+          - 9001:9001
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+      
+      - name: Set up Python
+        run: uv python install 3.11
+      
+      - name: Install dependencies
+        run: uv sync
+      
+      - name: Set up environment
+        run: |
+          cp env.example .env
+          echo "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/resumematch" >> .env
+          echo "MINIO_ENDPOINT=localhost:9000" >> .env
+          echo "MINIO_ACCESS_KEY=minioadmin" >> .env
+          echo "MINIO_SECRET_KEY=minioadmin" >> .env
+      
+      - name: Run database migrations
+        run: uv run alembic upgrade head
+      
+      - name: Start FastAPI application
+        run: |
+          uv run uvicorn main:app --host 0.0.0.0 --port 5001 &
+          sleep 10
+        env:
+          LOCAL_TEST_TOKEN: "test-jwt-token-local"
+      
+      - name: Wait for application to be ready
+        run: |
+          for i in {1..30}; do
+            if curl -f http://localhost:5001/health/live; then
+              echo "Application is ready"
+              break
+            fi
+            echo "Waiting for application... ($i/30)"
+            sleep 2
+          done
+      
+      - name: Run E2E tests
+        run: |
+          python run_e2e_tests.py --env local --markers smoke --report --verbose
+        env:
+          LOCAL_TEST_TOKEN: "test-jwt-token-local"
+      
+      - name: Upload test report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-test-report-local
+          path: reports/
+          retention-days: 30
+
+  e2e-staging:
+    name: E2E Tests (Staging)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'staging')
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+      
+      - name: Set up Python
+        run: uv python install 3.11
+      
+      - name: Install dependencies
+        run: uv sync
+      
+      - name: Run E2E tests against staging
+        run: |
+          python run_e2e_tests.py --env staging --markers ${{ github.event.inputs.test_markers || 'smoke' }} --report --verbose
+        env:
+          STAGING_TEST_TOKEN: ${{ secrets.STAGING_TEST_TOKEN }}
+      
+      - name: Upload test report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-test-report-staging
+          path: reports/
+          retention-days: 30
+      
+      - name: Notify on failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '❌ E2E tests failed against staging environment. Please check the test report.'
+            })
+
+  e2e-production-smoke:
+    name: E2E Smoke Tests (Production)
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production'))
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+      
+      - name: Set up Python
+        run: uv python install 3.11
+      
+      - name: Install dependencies
+        run: uv sync
+      
+      - name: Run production smoke tests
+        run: |
+          python run_e2e_tests.py --env production --markers critical --report --verbose
+        env:
+          PROD_TEST_TOKEN: ${{ secrets.PROD_TEST_TOKEN }}
+      
+      - name: Upload test report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-test-report-production
+          path: reports/
+          retention-days: 90
+      
+      - name: Create issue on failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: '🚨 Production E2E Tests Failed',
+              body: `Production E2E smoke tests failed on ${new Date().toISOString()}.
+              
+              **Environment:** Production
+              **Commit:** ${context.sha}
+              **Workflow:** ${context.workflow}
+              
+              Please investigate immediately and check the test report in the workflow artifacts.`,
+              labels: ['bug', 'production', 'urgent']
+            })
+
+  test-summary:
+    name: Test Summary
+    runs-on: ubuntu-latest
+    needs: [e2e-local, e2e-staging, e2e-production-smoke]
+    if: always()
+    
+    steps:
+      - name: Generate test summary
+        run: |
+          echo "## E2E Test Results Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ needs.e2e-local.result }}" == "success" ]; then
+            echo "✅ **Local E2E Tests**: Passed" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ needs.e2e-local.result }}" == "failure" ]; then
+            echo "❌ **Local E2E Tests**: Failed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⏭️ **Local E2E Tests**: Skipped" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ "${{ needs.e2e-staging.result }}" == "success" ]; then
+            echo "✅ **Staging E2E Tests**: Passed" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ needs.e2e-staging.result }}" == "failure" ]; then
+            echo "❌ **Staging E2E Tests**: Failed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⏭️ **Staging E2E Tests**: Skipped" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ "${{ needs.e2e-production-smoke.result }}" == "success" ]; then
+            echo "✅ **Production Smoke Tests**: Passed" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ needs.e2e-production-smoke.result }}" == "failure" ]; then
+            echo "❌ **Production Smoke Tests**: Failed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⏭️ **Production Smoke Tests**: Skipped" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "📊 **Test Reports**: Available in workflow artifacts" >> $GITHUB_STEP_SUMMARY
+
