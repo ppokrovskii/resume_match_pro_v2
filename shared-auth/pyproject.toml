@@ -88,9 +88,11 @@ addopts = [
 ]
 markers = [
     "unit: Unit tests",
-    "integration: Integration tests",
+    "integration: Integration tests (deselect with '-m \"not integration\"')",
+    "contract: Contract tests (deselect with '-m \"not contract\"')",
     "performance: Performance tests",
     "security: Security tests",
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
 ]
 
 [tool.coverage.run]

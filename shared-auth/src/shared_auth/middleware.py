@@ -649,6 +649,9 @@ class Auth0Middleware:
             
             return user
             
+        except HTTPException:
+            # Re-raise HTTPException as-is (already has correct status code)
+            raise
         except (InvalidTokenError, ExpiredTokenError, MissingClaimError) as e:
             raise HTTPException(
                 status_code=401,
@@ -725,6 +728,9 @@ class Auth0Middleware:
             
             return user
             
+        except HTTPException:
+            # Re-raise HTTPException as-is (already has correct status code)
+            raise
         except (InvalidTokenError, ExpiredTokenError, MissingClaimError) as e:
             raise HTTPException(
                 status_code=401,

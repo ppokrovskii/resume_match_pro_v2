@@ -82,45 +82,47 @@ def mock_no_org_user():
 @pytest.fixture
 def rsa_private_key():
     """RSA private key for JWT signing in tests."""
-    return """-----BEGIN RSA PRIVATE KEY-----
-MIIEpAIBAAKCAQEA4f5wg5l2hKsTeNem/V41fGnJm6gOdrj8ym3rFkEjWT2btYhA
-z2R6rvAjPOr9EqXQQrAqJqsJFF7dw3NK3F5p6anKpz07hrxhbU9Wye2u5EzIukE7
-k2D/WjjHVx1pa4196+5EnQJiMuHaFLu5i5gQa4gyNb6d9UlyJZjvCpVKjNqKnKBH
-rAHGfbdHQQhcbPsKXjKWpliQHC6HrXrs5wPAOiYbxIGxYo5cPiMNU9hBXaLDk/XK
-Hq1MHiKnlqHaLLjfHfqJmyQdtehHFe9KvQs7eKGSxDuHsxF9qatUa9Er4Dlz4AwV
-5mfpqUXzsjHnMZ/GVHptkHuHuHqk3hABfXsNXwIDAQABAoIBAEYhObhC0fVdH24P
-jh4/jjDUoEkEiEqp7kZ6T4Zc4KWDcEcsLiXhXobykJhidG/b6faUwcKZAbYxaaa0
-Wy2u1hUYieUnzGPUBpbE2hRhFYs9/l2YQgQNMVtSB/IpNxnfnvqaXpbHDKFpG2AN
-2o9qXRRJON2V3VvAXxRTsQs/P1JpAOI5B2yyHkqDTGR5+3Jh5fxFqHbmJ2HuMfMI
-kVK4fEHyqFsF6NUhfvzYy69l0t2wyWZrVA7v/sO0AOznmDbduHBBlaOYkn9VBOb7
-rjaulHsUHMiI22P9Xyp9J1qIuz7zZA8OQh4BQANCjV/EOE7kKaF3QmDNRRhqeQxy
-ovxfuPECgYEA+vIxr4Fu4fyaDNy/wfWjiRCRx1V/H9pyoAiIYeiZpNp4fv4g5+ls
-R8qdl7TC1m9l0l8IkqhPycE2k5LTmS/P7p+ARTbzI3/QQEh8Ck+gslcHrlxrUEyr
-7L7/OTaLxjUZqK8eJnyeVyh+oz+KU/+HLp22HKxtLbfbx91WLMF1k9MCgYEA5x8q
-Mf/FgQObgx+W6uCiuBiKwjQpIMi8hkr80b+CF+OZRQqJ2LiXpqhI1qGXiOaLjPXR
-+dEzSqHBzpnTMRBe00CjBwLxz/cL8uGRzYlBUBVXfA5g4A8/kxgUdnRYfp2lPkmz
-6wKBgGa3VGI2Uahkz/jc7p8i0VWwPgGRQ+6Uqmqage8GCJqbVbGh5Mn5Qx0YtGAd
-n0/dMUrLu9Oz7nkqAA5qQJ0wXm0c/oeRNdyenlP0NDtfSVBnbRxhdWy2ArHjKAAa
-rAhGxbDaMVvY7dhqRoKuNECrNYL5+Iw3flaABo4h5Lz0paTzAoGBAL9qUdY2/5n0
-WKmfFx9e7abfxLOHI4HcBuJiLI8vhPdHlE5d4sgE0nqwxHPD6t8+LQzGxS2+ArTI
-kOvRu4LrTXbmzxB0raUeNTOgprKjUBMjV8S/6aFHd+Zx5Qg5vTm9jGMmHgxGBhJl
-AoGAVqFTXZp6ea5s+kKBHAqhQzkmkDqGiuHTXU1gn2xHhUrw5C1TtlI2o4JGHZK3
-om+SUW+Pd2lh8dNqGTLV5NWFM0dwNdjZSmliSaHIjru+Z4XgPB+/wuuO24kt5+TO
-Q3D+XNBG4JqMXGbfDaUVJPAcvvXBH2y5Pk8+5+mwz5+FQMQ=
------END RSA PRIVATE KEY-----"""
+    return """-----BEGIN PRIVATE KEY-----
+MIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQC5GpuUdbDyglFp
+fyZAvSOXRX14A/Gy3j5Rks2CW/ok2UF9G3TkxaGUIR1Zb+EiCTDJCNyZNcCKI/dT
+D2GLiS9WyzaFGeEDM4LC26ytkLUKVv4eu0+ROWLpNSd/AejxD/a7GHTYvZeLtyxf
+8xPTN7tQ9X1LNxB1pFoTVf6otsBYt/e1TG8kgo9X9pSPkHvFQPI7WKn08jQYXdAc
+JOFA4vnNuyFkaUc39NiyKJ72dD5yiM6idfMb9rDClaRGsloQV7iEwSqrjgK2Aox6
+a1kwxhJsAdIdzv7rm7G89mSXEzKphQRpJPEgYJxZ/zSLiFknN/WE2WCtVOn+P21y
+zlXqcEKxAgMBAAECggEACXo+WavMPGF96MF38GACy9C0+bV1fVWd4hw6saRTFqqJ
+TO4gRkOkeBa5N4pn//+xl9SAY4eWGPiaFe6TXXMv6WEwpKBgZhMfzIl2AiHG9D1j
+p+gKLRbPrL5CDEGpNzkMlnQsTOnpsc+WWgASnXmkuZKlOHn8ebKJYmSwfBvV1cD4
+zLRKzmTMH5Ql2z2LH3VH2t2ut976yFK1LoYium+YlxP8FbGBZDxFj1lvawMn2O6B
+rKe8zt3vGw3nxzwewwlfoF7ib6/vmGUmIp5zCrVYRry5v+1ShSecAMbyySQx9w5a
+rZny204p4KhB3bvw8JnbJ8/oKypWj+sRyab+Ah+kAQKBgQDnRXCfHOie2/OIMy5g
++8mb5CdyVZXSbuv4AP0ol5N7FtaVp9CpqrIUuk5vZYXmw/OHARJKuLe9DoX/eR2y
+Up1E1iuXn9ekmJKRW4YqCRyhU9GOMCXEsUqRYzACworCO7rTfNLlZLu0hhLfnnfH
+xNl7glE+AkEZx2/jIdeGkke2sQKBgQDM5W984IvvEq0KJbzb1RCk+xxTfRJqOyll
+TuiqnRHUoji+oOGZwJLCFv0wFwHa64lidBpUlBxtcPPc2OrtM621VfYtuIMhfZuU
+PZdcEaL8nsB3YAo562wAkdpKE+TwXoHYKWL//4XSb+F6P1Xulcf0GK4Z79uytT5s
+ZeAJ/6xMAQKBgCZjEkR2ye3EWHHc/O/AG0Cy6BFEP3AEVUp+74ZTUnl12vxQNIRU
+/uYN3oMC+OzKzZs1BFI+wtCwnnE/Kzy0FcKdQfMS5vo9EObrqCNGC+iDPx84wqwZ
+OWVUb12l6N5Ah8wexeqpg7Z9IpjXds5D0E193fpK6X9b6ShsL5f4o8qhAoGAU7wk
+DtW5ek+YlgAMKY7uiW3yCpCfmPhql3NjFG6yXcKaDBW1fN89WsKIYEHWyT/e2nR2
+WkBZScSSdJvVjnDDOctSmya/uE0b6r4tADxY7oJ2R5LhOwBiF+2DVyjANBd7Wvq2
+8cXcS77bV9lQZfuiRrhbVlA26da2FxifMZbiNAECgYA4VQEkXK2/9aPsfHTEv+P2
+/v3VxWCpkBZH+8NouhNhKWCgygk5/7Baj901v6MwhtkP2OkMvlLAwdmh1cIa/rFc
+PWAsjyM4gs82mONCv3FOhRm9oNg90aiUdnCFQoZo1UKW6OrnNyf1iyAgFOAR9GBQ
+OXZ5+opVIS+T4u7k4ApgNg==
+-----END PRIVATE KEY-----"""
 
 
 @pytest.fixture
 def rsa_public_key():
     """RSA public key for JWT verification in tests."""
     return """-----BEGIN PUBLIC KEY-----
-MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA4f5wg5l2hKsTeNem/V41
-fGnJm6gOdrj8ym3rFkEjWT2btYhAz2R6rvAjPOr9EqXQQrAqJqsJFF7dw3NK3F5p
-6anKpz07hrxhbU9Wye2u5EzIukE7k2D/WjjHVx1pa4196+5EnQJiMuHaFLu5i5gQ
-a4gyNb6d9UlyJZjvCpVKjNqKnKBHrAHGfbdHQQhcbPsKXjKWpliQHC6HrXrs5wPA
-OiYbxIGxYo5cPiMNU9hBXaLDk/XKHq1MHiKnlqHaLLjfHfqJmyQdtehHFe9KvQs7
-eKGSxDuHsxF9qatUa9Er4Dlz4AwV5mfpqUXzsjHnMZ/GVHptkHuHuHqk3hABfXsN
-XwIDAQAB
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAuRqblHWw8oJRaX8mQL0j
+l0V9eAPxst4+UZLNglv6JNlBfRt05MWhlCEdWW/hIgkwyQjcmTXAiiP3Uw9hi4kv
+Vss2hRnhAzOCwtusrZC1Clb+HrtPkTli6TUnfwHo8Q/2uxh02L2Xi7csX/MT0ze7
+UPV9SzcQdaRaE1X+qLbAWLf3tUxvJIKPV/aUj5B7xUDyO1ip9PI0GF3QHCThQOL5
+zbshZGlHN/TYsiie9nQ+cojOonXzG/awwpWkRrJaEFe4hMEqq44CtgKMemtZMMYS
+bAHSHc7+65uxvPZklxMyqYUEaSTxIGCcWf80i4hZJzf1hNlgrVTp/j9tcs5V6nBC
+sQIDAQAB
 -----END PUBLIC KEY-----"""
 
 
@@ -168,6 +170,117 @@ def valid_jwt_payload():
         "roles": ["member"],
         "organization_id": "org-456"
     }
+
+
+@pytest.fixture
+def test_organizations():
+    """Create test organizations for isolation testing."""
+    return {
+        "org_a": "org-123",
+        "org_b": "org-456",
+        "org_c": "org-789"
+    }
+
+
+@pytest.fixture
+def mock_auth_gateway():
+    """Simulate API Gateway auth processing."""
+    class MockAuthGateway:
+        def __init__(self):
+            self.middleware = Auth0Middleware(
+                domain="test.auth0.com",
+                api_identifier="https://test-api.resumematch.com"
+            )
+        
+        async def process_request(self, jwt_token: str) -> dict:
+            """Simulate gateway processing a request with JWT token."""
+            from unittest.mock import Mock
+            
+            # Mock credentials
+            credentials = Mock()
+            credentials.credentials = jwt_token
+            
+            # Process through middleware
+            user_context = await self.middleware.verify_token_from_credentials(credentials)
+            
+            # Return headers that would be passed to internal service
+            return {
+                "X-User-ID": user_context.user_id,
+                "X-User-Email": user_context.email,
+                "X-Organization-ID": user_context.organization_id,
+                "X-User-Roles": ",".join(user_context.roles),
+                "X-User-Scopes": " ".join(user_context.scopes)
+            }
+    
+    return MockAuthGateway()
+
+
+def create_test_user(user_id: str = None, email: str = None, org_id: str = "DEFAULT", roles: list = None):
+    """Create a test user with specified attributes."""
+    from shared_auth.models import AuthUser
+    from shared_auth.utils import auth0_subject_to_uuid
+    
+    user_id = user_id or "test-user-123"
+    email = email or f"{user_id}@example.com"
+    # Use sentinel value to distinguish between None and not provided
+    if org_id == "DEFAULT":
+        org_id = "org-123"
+    roles = roles or ["member"]
+    
+    return AuthUser(
+        user_id=auth0_subject_to_uuid(f"auth0|{user_id}"),
+        email=email,
+        organization_id=org_id,
+        roles=roles,
+        auth0_subject=f"auth0|{user_id}",
+        email_verified=True,
+        scopes=["read:documents", "write:documents"]
+    )
+
+
+def create_valid_jwt_token(user_id: str = None, org_id: str = None, roles: list = None):
+    """Create a valid JWT token for testing."""
+    import jwt
+    from datetime import datetime, timedelta
+    
+    user_id = user_id or "test-user-123"
+    org_id = org_id or "org-123"
+    roles = roles or ["member"]
+    
+    now = datetime.utcnow()
+    payload = {
+        "sub": f"auth0|{user_id}",
+        "email": f"{user_id}@example.com",
+        "email_verified": True,
+        "aud": "https://test-api.resumematch.com",
+        "iss": "https://test.auth0.com/",
+        "iat": int(now.timestamp()),
+        "exp": int((now + timedelta(hours=1)).timestamp()),
+        "scope": "read:documents write:documents",
+        "roles": roles,
+        "organization_id": org_id
+    }
+    
+    # Use a simple symmetric key for testing
+    return jwt.encode(payload, "test-secret", algorithm="HS256")
+
+
+class MockDocument:
+    """Mock document for testing organization boundaries."""
+    def __init__(self, doc_id: str, owner_org: str, content: str = "test content"):
+        self.id = doc_id
+        self.owner_org = owner_org
+        self.content = content
+        self.created_at = datetime.utcnow()
+
+
+def create_test_document(doc_id: str = None, owner_org: str = None, content: str = None):
+    """Create a test document with specified attributes."""
+    doc_id = doc_id or "doc-123"
+    owner_org = owner_org or "org-123"
+    content = content or "test document content"
+    
+    return MockDocument(doc_id, owner_org, content)
 
 
 @pytest.fixture
