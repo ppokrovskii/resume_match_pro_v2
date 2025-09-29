@@ -2,12 +2,14 @@
 
 ## Architecture Overview
 
-**Architecture Pattern**: Serverless Microservices  
-**Language**: Python 3.11+  
-**Framework**: Flask with serverless deployment  
+**Architecture Pattern**: Event-Driven Serverless Microservices  
+**Language**: Python 3.11+ (Backend), TypeScript (Frontend)  
+**Framework**: FastAPI with Azure Functions  
 **Package Manager**: uv  
-**Infrastructure**: Hybrid (Supabase Auth + Azure AI Services)  
+**Infrastructure**: Azure-native with PostgreSQL  
 **Frontend**: React with TypeScript  
+**Authentication**: Auth0 (managed service)  
+**Message Queue**: Azure Storage Queues  
 **Deployment**: Infrastructure as Code (Terraform)  
 **Observability**: OpenTelemetry for distributed tracing  
 
@@ -15,21 +17,24 @@
 
 ### Service Decomposition
 
-The system is decomposed into 4 core components:
+The system is decomposed into 6 core components:
 
 1. **Frontend Application** (`frontend/`) - React TypeScript SPA
-2. **Document Service** (`document-service/`) - File processing microservice
-3. **AI Service** (`ai-service/`) - ML/AI operations microservice
-4. **Web API Gateway** (`api-gateway/`) - Request routing microservice
+2. **API Gateway** (`api-gateway/`) - Request routing and auth validation
+3. **Document Service** (`document-service/`) - Document CRUD and storage
+4. **AI Text Extract Service** (`ai-text-extract/`) - Text extraction and file type detection
+5. **Matches Service** (`matches-service/`) - Match results CRUD and orchestration
+6. **AI Match Service** (`ai-match/`) - Match score calculation
 
-**Note**: Authentication is handled by Supabase Auth (managed service)
+**Note**: Authentication is handled by Auth0 (managed service)
 
 ### Service Communication
 
-- **Synchronous**: REST APIs for user-facing operations
-- **Authentication**: Supabase Auth with JWT token validation
+- **Synchronous**: REST APIs for user-facing operations (via API Gateway)
+- **Asynchronous**: Azure Storage Queues for event-driven processing
+- **Authentication**: Auth0 JWT validation at API Gateway only
+- **Service-to-Service**: Trusted internal communication (no auth between services)
 - **Observability**: OpenTelemetry for distributed tracing
-- **Async Processing**: Simple queues for MVP (Redis-based)
 
 ## Technology Stack
 
@@ -42,26 +47,28 @@ The system is decomposed into 4 core components:
 
 ### Backend Services
 - **Runtime**: Python 3.11+
-- **Web Framework**: Flask 3.x with Flask-CORS
+- **Web Framework**: FastAPI (async, high-performance)
 - **Package Management**: uv (fast Python package installer)
 - **Serverless**: Azure Functions (consumption plan)
-- **API Gateway**: Flask-based gateway (cost-optimized)
+- **Container Runtime**: Support for both Azure Functions and Container Apps
 
 ### Authentication & User Management
-- **Auth Service**: Supabase Auth (managed)
-- **User Database**: Supabase PostgreSQL
-- **JWT Validation**: Supabase client libraries
+- **Auth Service**: Auth0 (managed service)
+- **JWT Validation**: Auth0 JWT with RS256
+- **User Database**: PostgreSQL (user profiles and organizations)
+- **Shared Auth**: Reusable auth middleware package
 
-### Data Layer (Cost-Optimized)
-- **Document Metadata**: Supabase PostgreSQL
-- **Vector Database**: Supabase pgvector extension
-- **File Storage**: Supabase Storage
-- **Cache**: Redis (free tier or local Redis)
+### Data Layer
+- **Document Metadata**: PostgreSQL with proper indexing
+- **File Storage**: Azure Blob Storage
+- **Message Queue**: Azure Storage Queues
+- **Cache**: Redis (for performance optimization)
 
 ### AI/ML Stack
+- **Text Extraction**: Azure AI Document Intelligence + local processing
 - **Embeddings**: Azure OpenAI (pay-per-use)
-- **Document Processing**: pypdf2/python-docx (local processing)
-- **Vector Similarity**: PostgreSQL pgvector
+- **File Type Detection**: Azure OpenAI GPT models
+- **Vector Similarity**: Custom similarity algorithms
 
 ### Infrastructure & DevOps
 - **IaC**: Terraform (multi-cloud flexibility)
@@ -71,11 +78,11 @@ The system is decomposed into 4 core components:
 
 ## Service Details
 
-### 1. Frontend Application (React TypeScript)
+### 1. Frontend Application (`frontend/`)
 
 **Technology Stack:**
 - React 18 with TypeScript
-- Supabase Auth client
+- Auth0 client integration
 - Tailwind CSS + Headless UI
 - Zustand for state management
 
@@ -85,27 +92,40 @@ The system is decomposed into 4 core components:
 - Real-time search and filtering
 - Responsive design
 
-**Authentication Flow:**
-```typescript
-import { createClient } from '@supabase/supabase-js'
+**API Integration:**
+- All requests go through API Gateway
+- Auth0 JWT tokens for authentication
+- Real-time updates via polling or WebSockets
 
-const supabase = createClient(
-  process.env.REACT_APP_SUPABASE_URL!,
-  process.env.REACT_APP_SUPABASE_ANON_KEY!
-)
+### 2. API Gateway (`api-gateway/`)
 
-// Login with email/password
-const { data, error } = await supabase.auth.signInWithPassword({
-  email, password
-})
+**Responsibilities:**
+- Single entry point for all frontend requests
+- Auth0 JWT token validation
+- Request routing to appropriate microservices
+- CORS handling and rate limiting
+- Response aggregation for complex queries
 
-// Google OAuth
-const { data, error } = await supabase.auth.signInWithOAuth({
-  provider: 'google'
-})
+**Technology Stack:**
+- FastAPI with Azure Functions
+- Auth0 JWT validation
+- Request/response transformation
+- OpenTelemetry tracing
+
+**Authentication Pattern:**
+```python
+# Only API Gateway validates JWT tokens
+# Internal services trust the gateway
+@app.middleware("http")
+async def add_user_context(request: Request, call_next):
+    # Validate JWT and extract user info
+    user_context = await verify_auth0_token(request)
+    # Add user context to internal service calls
+    request.state.user = user_context
+    return await call_next(request)
 ```
 
-### 2. Document Service (`document-service/`)
+### 3. Document Service (`document-service/`) - **IMPLEMENTED**
 
 **Responsibilities:**
 - File upload/download management
@@ -140,7 +160,32 @@ document-service/
 - `GET /documents/{id}/download` - Download file
 - `DELETE /documents/{id}` - Delete document
 
-### 3. AI Service (`ai-service/`)
+### 4. AI Text Extract Service (`ai-text-extract/`)
+
+**Responsibilities:**
+- Listen to `document.created` events from Azure Storage Queues
+- Extract text from PDF/Word documents
+- Detect document type (CV vs Job Description) using AI
+- Extract structured data (role, skills, features)
+- Update document metadata via Document Service API
+
+**Technology Stack:**
+- FastAPI with Azure Functions
+- Azure AI Document Intelligence for PDF processing
+- python-docx for Word document processing
+- Azure OpenAI for file type detection and data extraction
+- Shared auth middleware for API calls
+
+### 5. Matches Service (`matches-service/`)
+
+**Responsibilities:**
+- Match results CRUD operations
+- Listen to `document.properties.updated` events
+- Find documents that need match score calculation
+- Orchestrate match calculation requests
+- Store and serve match results
+
+### 6. AI Match Service (`ai-match/`)
 
 **Responsibilities:**
 - Embedding generation
@@ -202,25 +247,153 @@ api-gateway/
     └── response_formatter.py  # Response formatting
 ```
 
+## Event-Driven Architecture
+
+### Message Flow
+
+```
+1. Frontend → API Gateway → Document Service
+   ↓ (document.created event)
+2. AI Text Extract Service → Document Service API
+   ↓ (document.properties.updated event)  
+3. Matches Service → AI Match Service
+   ↓ (match.calculation.requested events)
+4. AI Match Service → Matches Service API
+   ↓ (results)
+5. Frontend ← API Gateway ← Matches Service
+```
+
+### Event Schemas
+
+#### Document Created Event
+```json
+{
+  "event_type": "document.created",
+  "document_id": "uuid",
+  "content_type": "application/pdf",
+  "timestamp": "2024-01-15T10:30:00Z"
+}
+```
+
+#### Document Properties Updated Event
+```json
+{
+  "event_type": "document.properties.updated", 
+  "document": {
+    "id": "uuid",
+    "file_type": "cv",
+    "text_content": "extracted text...",
+    "role": "Python Developer",
+    "features": [...]
+  }
+}
+```
+
+#### Match Calculation Requested Event
+```json
+{
+  "event_type": "match.calculation.requested",
+  "cv_document": { /* full CV document data */ },
+  "jd_document": { /* full JD document data */ },
+  "request_id": "uuid"
+}
+```
+
+### Azure Storage Queues Configuration
+
+- **Queue Names**: `document-events`, `match-events`
+- **Message TTL**: 7 days
+- **Dead Letter Queue**: Enabled for failed processing
+- **Visibility Timeout**: 30 seconds
+- **Max Delivery Count**: 3
+
+## Shared Authentication Middleware
+
+### Reusable Auth Package
+
+Create a shared Python package for all microservices:
+
+```python
+# shared-auth/auth_middleware.py
+from fastapi import HTTPException, Depends, Request
+from fastapi.security import HTTPBearer
+import jwt
+import requests
+from functools import lru_cache
+
+class Auth0Middleware:
+    def __init__(self, domain: str, api_identifier: str):
+        self.domain = domain
+        self.api_identifier = api_identifier
+        self.security = HTTPBearer(auto_error=False)
+    
+    @lru_cache()
+    def get_jwks(self):
+        """Cache JWKS for performance"""
+        response = requests.get(f"https://{self.domain}/.well-known/jwks.json")
+        return response.json()
+    
+    async def verify_token(self, credentials = Depends(security)):
+        """Verify Auth0 JWT token"""
+        # Implementation from document-service/middleware/auth0_middleware.py
+        pass
+
+# Usage in each microservice:
+from shared_auth import Auth0Middleware
+
+auth = Auth0Middleware(
+    domain=os.getenv("AUTH0_DOMAIN"),
+    api_identifier=os.getenv("AUTH0_API_IDENTIFIER")
+)
+
+@app.get("/protected")
+async def protected_route(user = Depends(auth.verify_token)):
+    return {"user": user}
+```
+
+### API Gateway Pattern
+
+Only API Gateway validates JWT tokens:
+
+```python
+# api-gateway: Full JWT validation
+@app.middleware("http") 
+async def auth_middleware(request: Request, call_next):
+    user = await verify_auth0_token(request)
+    # Add user context to internal service calls
+    request.state.user = user
+    return await call_next(request)
+
+# Internal services: Trust the gateway
+@app.middleware("http")
+async def trust_gateway(request: Request, call_next):
+    # Extract user context from gateway headers
+    user_id = request.headers.get("X-User-ID")
+    org_id = request.headers.get("X-Organization-ID") 
+    request.state.user = {"user_id": user_id, "org_id": org_id}
+    return await call_next(request)
+```
+
 ## Infrastructure Design (Cost-Optimized MVP)
 
-### Hybrid Architecture
+### Azure-Native Architecture
 
-**Supabase (Primary - Free Tier):**
-- Authentication and user management
-- PostgreSQL database with pgvector
-- File storage
-- Real-time subscriptions
-- Row-level security
+**Core Azure Services:**
+- Azure Functions (consumption plan) - Serverless compute
+- Azure PostgreSQL Flexible Server - Database
+- Azure Blob Storage - File storage
+- Azure Storage Queues - Message queues
+- Azure OpenAI - AI/ML services
+- Azure AI Document Intelligence - Text extraction
 
-**Azure (Pay-per-use):**
-- Azure Functions (consumption plan)
-- Azure OpenAI (embeddings only)
+**Authentication & Identity:**
+- Auth0 (managed service) - JWT authentication
+- PostgreSQL - User profiles and organizations
 
-**Free/Cheap Services:**
+**Development & Monitoring:**
 - Frontend: Vercel/Netlify free tier
-- Monitoring: Self-hosted Jaeger
-- Cache: Redis free tier or local Redis
+- Monitoring: Self-hosted Jaeger + OpenTelemetry
+- Cache: Azure Redis Cache (basic tier)
 
 **Infrastructure as Code (Terraform):**
 ```

@@ -2,30 +2,33 @@
 
 AI-powered resume matching system with serverless microservices architecture.
 
-## Architecture (Hybrid Cost-Optimized)
+## Architecture (Event-Driven Serverless Microservices)
 
 - **Frontend**: React 18 with TypeScript (Vercel/Netlify free tier)
-- **Authentication**: Supabase Auth (managed service)
-- **Document Service**: File upload, parsing, and text extraction (Azure Functions)
-- **AI Service**: Embedding generation and semantic matching (Azure Functions + OpenAI)
-- **API Gateway**: Request routing and service orchestration (Azure Functions)
-- **Database**: Supabase PostgreSQL with pgvector
-- **Storage**: Supabase Storage
+- **API Gateway**: Request routing and Auth0 JWT validation (Azure Functions)
+- **Document Service**: Document CRUD and file storage (Azure Functions + Blob Storage)
+- **AI Text Extract**: Text extraction and file type detection (Azure Functions + OpenAI)
+- **Matches Service**: Match results CRUD and orchestration (Azure Functions)
+- **AI Match Service**: Match score calculation (Azure Functions + OpenAI)
+- **Authentication**: Auth0 (managed service)
+- **Database**: Azure PostgreSQL Flexible Server
+- **Message Queue**: Azure Storage Queues
 - **Observability**: OpenTelemetry + self-hosted Jaeger
 
-## Technology Stack (Cost-Optimized)
+## Technology Stack
 
 - **Language**: Python 3.11+ (Backend), TypeScript (Frontend)
-- **Framework**: Flask (serverless), React 18
+- **Framework**: FastAPI (async, high-performance), React 18
 - **Package Manager**: uv
-- **Infrastructure**: Terraform (multi-cloud)
-- **Auth**: Supabase Auth (free tier: unlimited users)
-- **Database**: Supabase PostgreSQL with pgvector (free tier: 500MB)
-- **Storage**: Supabase Storage (free tier: 1GB)
-- **AI**: Azure OpenAI (pay-per-use: ~$0.0001/1K tokens)
-- **Compute**: Azure Functions consumption plan (free tier: 1M requests)
+- **Infrastructure**: Terraform (Azure-native)
+- **Auth**: Auth0 (managed JWT service)
+- **Database**: Azure PostgreSQL Flexible Server
+- **Storage**: Azure Blob Storage
+- **Message Queue**: Azure Storage Queues
+- **AI**: Azure OpenAI + Azure AI Document Intelligence
+- **Compute**: Azure Functions consumption plan
 - **Frontend Hosting**: Vercel/Netlify (free tier)
-- **Total Cost**: $0-50/month for MVP
+- **Shared Components**: Reusable auth middleware package
 
 ## Quick Start
 
@@ -51,10 +54,14 @@ AI-powered resume matching system with serverless microservices architecture.
 
 3. **Install dependencies**:
    ```bash
-   # Backend services
-   cd document-service && uv pip install -r requirements.txt && cd ..
-   cd ai-service && uv pip install -r requirements.txt && cd ..
+   # Backend services (document-service already implemented)
    cd api-gateway && uv pip install -r requirements.txt && cd ..
+   cd ai-text-extract && uv pip install -r requirements.txt && cd ..
+   cd matches-service && uv pip install -r requirements.txt && cd ..
+   cd ai-match && uv pip install -r requirements.txt && cd ..
+   
+   # Shared auth package
+   cd shared-auth && uv pip install -e . && cd ..
    
    # Frontend
    cd frontend && npm install && cd ..
@@ -75,19 +82,30 @@ AI-powered resume matching system with serverless microservices architecture.
 
 ```
 resume_match_pro_v2/
-├── frontend/              # React TypeScript application
-├── document-service/      # Document management microservice
-├── ai-service/           # AI/ML operations microservice
-├── api-gateway/          # API gateway microservice
-├── infrastructure/       # Infrastructure as Code (Terraform)
-│   └── sql/             # Database initialization scripts
-├── tests/               # Integration tests
-├── docker-compose.yml   # Local development stack
-├── .cursorrules         # Development guidelines
-└── solution_design.md   # Architecture documentation
+├── frontend/
+│   └── docs/            # Frontend documentation
+├── api-gateway/
+│   └── docs/            # API Gateway documentation  
+├── document-service/    # Document CRUD microservice (IMPLEMENTED)
+│   └── docs/            # Service documentation
+├── ai-text-extract/
+│   └── docs/            # AI Text Extract documentation
+├── matches-service/
+│   └── docs/            # Matches Service documentation
+├── ai-match/
+│   └── docs/            # AI Match documentation
+├── shared-auth/
+│   └── docs/            # Shared auth package documentation
+├── infrastructure/      # Infrastructure as Code (Terraform)
+│   └── sql/            # Database initialization scripts
+├── tests/              # Integration tests
+├── docker-compose.yml  # Local development stack
+├── test_plan.md        # Overall MVP test plan
+├── .cursorrules        # Development guidelines
+└── solution_design.md  # Main architecture documentation
 ```
 
-Note: Authentication is handled by Supabase Auth (managed service)
+Note: Authentication is handled by Auth0 (managed service)
 
 ## Services
 

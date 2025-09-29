@@ -1,0 +1,207 @@
+name: Shared Auth CI/CD
+
+on:
+  push:
+    branches: [dev]
+    paths:
+      - 'shared-auth/**'
+  pull_request:
+    branches: [dev]
+    paths:
+      - 'shared-auth/**'
+  workflow_dispatch:
+    inputs:
+      major_version_bump:
+        description: 'Bump major version (breaking changes)'
+        required: false
+        type: boolean
+        default: false
+      skip_publish:
+        description: 'Skip publishing (test only)'
+        required: false
+        type: boolean
+        default: false
+
+defaults:
+  run:
+    working-directory: shared-auth
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Install uv
+      uses: astral-sh/setup-uv@v2
+      with:
+        version: "latest"
+    
+    - name: Install dependencies
+      run: |
+        uv venv
+        uv pip install -e ".[test,dev]"
+    
+    - name: Run linting
+      run: |
+        uv run ruff check src/ tests/ || echo "Linting issues found"
+        uv run mypy src/ || echo "Type checking issues found"
+    
+    - name: Run tests
+      run: |
+        uv run pytest tests/ --cov=src/shared_auth --cov-report=term-missing --cov-report=xml --cov-fail-under=80
+
+  build-and-publish:
+    needs: test
+    runs-on: ubuntu-latest
+    # Only run on push to dev (not on PRs)
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    permissions:
+      contents: write
+      packages: write
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        fetch-depth: 0
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
+    
+    - name: Install uv
+      uses: astral-sh/setup-uv@v2
+      with:
+        version: "latest"
+    
+    - name: Version management
+      id: version
+      run: |
+        # Skip publishing if requested
+        if [ "${{ github.event.inputs.skip_publish }}" = "true" ]; then
+          echo "Skipping version bump and publish"
+          exit 0
+        fi
+        
+        # Read current version from VERSION file
+        if [ -f "VERSION" ]; then
+          CURRENT_VERSION=$(cat VERSION | tr -d '\n\r')
+        else
+          CURRENT_VERSION="0.1.0"
+        fi
+        
+        echo "Current version: $CURRENT_VERSION"
+        IFS='.' read -r major minor patch <<< "$CURRENT_VERSION"
+        
+        # Handle version bump
+        if [ "${{ github.event.inputs.major_version_bump }}" = "true" ]; then
+          # Major version bump (breaking changes)
+          NEW_VERSION="$((major + 1)).0.0"
+          echo "Major version bump: $CURRENT_VERSION -> $NEW_VERSION"
+        else
+          # Auto-increment minor version (new features)
+          NEW_VERSION="$major.$((minor + 1)).0"
+          echo "Minor version bump: $CURRENT_VERSION -> $NEW_VERSION"
+        fi
+        
+        # Update VERSION file
+        echo "$NEW_VERSION" > VERSION
+        
+        # Update pyproject.toml
+        sed -i "s/version = \".*\"/version = \"$NEW_VERSION\"/" pyproject.toml
+        
+        # Set outputs
+        echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+        echo "tag=v$NEW_VERSION" >> $GITHUB_OUTPUT
+        echo "major=$(echo $NEW_VERSION | cut -d. -f1)" >> $GITHUB_OUTPUT
+        echo "minor=$(echo $NEW_VERSION | cut -d. -f2)" >> $GITHUB_OUTPUT
+        echo "patch=$(echo $NEW_VERSION | cut -d. -f3)" >> $GITHUB_OUTPUT
+        
+        echo "New version: $NEW_VERSION"
+    
+    - name: Install dependencies and test
+      run: |
+        uv venv
+        uv pip install -e ".[test,dev]"
+        uv pip install build twine
+        
+        # Run tests
+        uv run pytest tests/ --cov=src/shared_auth --cov-fail-under=80
+    
+    - name: Build package
+      run: |
+        uv build
+        uv run twine check dist/*
+    
+    - name: Publish to PyPI
+      env:
+        TWINE_USERNAME: __token__
+        TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+      run: |
+        if [ -n "${{ secrets.PYPI_API_TOKEN }}" ]; then
+          uv run twine upload dist/*
+          echo "Published to PyPI"
+        else
+          echo "PYPI_API_TOKEN not set, skipping PyPI upload"
+        fi
+    
+    - name: Commit version files
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add VERSION pyproject.toml
+        git commit -m "Release shared-auth v${{ steps.version.outputs.version }}" || exit 0
+        git push origin dev
+    
+    - name: Create GitHub Release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: shared-auth-${{ steps.version.outputs.tag }}
+        release_name: Shared Auth ${{ steps.version.outputs.tag }}
+        body: |
+          ## Shared Auth Library Release ${{ steps.version.outputs.version }}
+          
+          ### Version Info
+          - **Major**: ${{ steps.version.outputs.major }} (breaking changes)
+          - **Minor**: ${{ steps.version.outputs.minor }} (features, auto-incremented)
+          - **Patch**: ${{ steps.version.outputs.patch }} (always 0 in hybrid system)
+          
+          ### Installation
+          ```bash
+          pip install resume-match-shared-auth==${{ steps.version.outputs.version }}
+          ```
+          
+          ### Usage
+          ```python
+          from shared_auth import Auth0Middleware, validate_auth0_config, require_auth
+          
+          # Validate configuration at startup
+          validate_auth0_config()
+          
+          # Initialize middleware
+          auth = Auth0Middleware()
+          ```
+          
+          ### What's New
+          - See commit history for detailed changes
+          - OpenTelemetry tracing support
+          - Enhanced startup validation
+          - Improved security controls
+          
+        draft: false
+        prerelease: false

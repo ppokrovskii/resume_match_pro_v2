@@ -197,3 +197,9 @@ service-account.json
 uploads/
 downloads/
 storage/
+
+# UV package manager binaries
+uv
+*/uv
+document-service/uv
+
