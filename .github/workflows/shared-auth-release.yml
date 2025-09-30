@@ -179,7 +179,7 @@ jobs:
         TWINE_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
       run: |
         echo "Uploading to GitHub Packages..."
-        uv run twine upload --repository-url https://upload.pypi.pkg.github.com/ppokrovskii/
+        uv run twine upload --repository-url https://upload.pypi.org/legacy/ dist/*
     
     - name: Commit version files
       run: |
