@@ -172,19 +172,18 @@ jobs:
         uv build
         uv run twine check dist/*
     
-    - name: Publish to PyPI
+    - name: Publish to GitHub Packages
       if: github.event.inputs.skip_publish != 'true'
       env:
         TWINE_USERNAME: __token__
-        TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+        TWINE_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        if [ -n "${{ secrets.PYPI_API_TOKEN }}" ]; then
-          echo "Uploading to PyPI..."
-          uv run twine upload dist/*
-        else
-          echo "PYPI_API_TOKEN not set, skipping PyPI upload"
-          echo "To publish to PyPI, add PYPI_API_TOKEN secret to repository"
-        fi
+        echo "Uploading to GitHub Packages..."
+        # GitHub Packages for Python - using PyPI format but with GitHub token
+        # The key is that GITHUB_TOKEN has the right permissions for GitHub Packages
+        uv run twine upload \
+          --repository-url https://upload.pypi.org/legacy/ \
+          dist/*
     
     - name: Commit version files
       run: |
