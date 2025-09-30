@@ -112,7 +112,6 @@ jobs:
     
     - name: Version management
       id: version
-      if: github.event.inputs.skip_publish != 'true'
       run: |
         
         # Read current version from VERSION file
@@ -169,17 +168,23 @@ jobs:
     
     - name: Build package
       run: |
+        uv pip install twine
         uv build
         uv run twine check dist/*
     
-    - name: Publish to GitHub Packages
+    - name: Publish to PyPI
       if: github.event.inputs.skip_publish != 'true'
       env:
         TWINE_USERNAME: __token__
-        TWINE_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+        TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
       run: |
-        echo "Uploading to GitHub Packages..."
-        uv run twine upload --repository-url https://upload.pypi.org/legacy/ dist/*
+        if [ -n "${{ secrets.PYPI_API_TOKEN }}" ]; then
+          echo "Uploading to PyPI..."
+          uv run twine upload dist/*
+        else
+          echo "PYPI_API_TOKEN not set, skipping PyPI upload"
+          echo "To publish to PyPI, add PYPI_API_TOKEN secret to repository"
+        fi
     
     - name: Commit version files
       run: |
