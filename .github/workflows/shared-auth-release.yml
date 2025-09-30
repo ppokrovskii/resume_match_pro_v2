@@ -5,10 +5,12 @@ on:
     branches: [dev]
     paths:
       - 'shared-auth/**'
+      - '.github/workflows/shared-auth-release.yml'
   pull_request:
     branches: [dev]
     paths:
       - 'shared-auth/**'
+      - '.github/workflows/shared-auth-release.yml'
   workflow_dispatch:
     inputs:
       major_version_bump:
