@@ -161,29 +161,34 @@ jobs:
       run: |
         uv venv
         uv pip install -e ".[test,dev]"
-        uv pip install build twine
+        uv pip install build twine keyring artifacts-keyring
         
         # Run tests
         uv run pytest tests/ --cov=src/shared_auth --cov-fail-under=30
     
     - name: Build package
       run: |
-        uv pip install twine
         uv build
         uv run twine check dist/*
     
-    - name: Publish to GitHub Packages
+    - name: Publish to Azure Artifacts
       if: github.event.inputs.skip_publish != 'true'
       env:
         TWINE_USERNAME: __token__
-        TWINE_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+        TWINE_PASSWORD: ${{ secrets.AZURE_ARTIFACTS_TOKEN }}
       run: |
-        echo "Uploading to GitHub Packages..."
-        # GitHub Packages for Python - using PyPI format but with GitHub token
-        # The key is that GITHUB_TOKEN has the right permissions for GitHub Packages
-        uv run twine upload \
-          --repository-url https://upload.pypi.org/legacy/ \
-          dist/*
+        echo "Configuring Azure Artifacts credentials..."
+        cat <<'EOF' > ~/.pypirc
+        [distutils]
+        index-servers = py_feed
+
+        [py_feed]
+        repository = https://pkgs.dev.azure.com/resumematchproV2/rmp_v2_nonprod/_packaging/py_feed/pypi/upload/
+        username = __token__
+        password = ${{ secrets.AZURE_ARTIFACTS_TOKEN }}
+        EOF
+        echo "Uploading to Azure Artifacts feed..."
+        uv run twine upload --repository py_feed dist/*
     
     - name: Commit version files
       run: |
