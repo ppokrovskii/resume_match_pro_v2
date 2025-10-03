@@ -54,6 +54,9 @@ addopts = [
     "--cov-report=html",
     "--cov-fail-under=80",
 ]
+markers = [
+    "asyncio: marks tests as async (deselect with '-m \"not asyncio\"')",
+]
 
 [tool.black]
 line-length = 88
@@ -93,5 +96,6 @@ exclude = [
 dev = [
     "black>=25.9.0",
     "isort>=6.1.0",
+    "mypy>=1.18.2",
 ]
 
