@@ -706,6 +706,12 @@ dev = [
     { name = "requests" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "black" },
+    { name = "isort" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "datamodel-code-generator", extras = ["http"], marker = "extra == 'dev'", specifier = ">=0.21.0" },
@@ -717,6 +723,12 @@ requires-dist = [
     { name = "typing-extensions", specifier = ">=4.8.0" },
 ]
 provides-extras = ["dev"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "black", specifier = ">=25.9.0" },
+    { name = "isort", specifier = ">=6.1.0" },
+]
 
 [[package]]
 name = "sniffio"

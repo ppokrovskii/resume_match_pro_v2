@@ -17,7 +17,7 @@ from .base import (
 
 __all__ = [
     "BaseSharedModel",
-    "ErrorResponse", 
+    "ErrorResponse",
     "MetadataMixin",
     "PaginationResponse",
     "SuccessResponse",

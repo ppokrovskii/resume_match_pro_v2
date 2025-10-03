@@ -1,8 +1,9 @@
 """Test configuration for shared models package."""
 
-import pytest
 from datetime import datetime
 from uuid import uuid4
+
+import pytest
 
 
 @pytest.fixture
@@ -29,7 +30,7 @@ def sample_feature_properties():
     return {
         "years": 5,
         "level": "expert",
-        "description": "Advanced Python programming skills"
+        "description": "Advanced Python programming skills",
     }
 
 
@@ -37,19 +38,21 @@ def sample_feature_properties():
 def sample_feature(sample_feature_properties):
     """Sample feature for testing."""
     from shared_models.generated.document_service import Feature, FeatureProperties
-    
+
     return Feature(
         name="Python",
         type="skill",
-        properties=FeatureProperties(**sample_feature_properties)
+        properties=FeatureProperties(**sample_feature_properties),
     )
 
 
 @pytest.fixture
-def sample_document_response(sample_document_id, sample_user_id, sample_organization_id, sample_feature):
+def sample_document_response(
+    sample_document_id, sample_user_id, sample_organization_id, sample_feature
+):
     """Sample document response for testing."""
     from shared_models.generated.document_service import DocumentResponse
-    
+
     return DocumentResponse(
         id=sample_document_id,
         user_id=sample_user_id,
@@ -65,5 +68,5 @@ def sample_document_response(sample_document_id, sample_user_id, sample_organiza
         processing_status="completed",
         metadata={"confidence_score": 0.95},
         created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow()
+        updated_at=datetime.utcnow(),
     )
