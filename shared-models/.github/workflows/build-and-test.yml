@@ -1,0 +1,479 @@
+name: Shared Models - Build, Test & Publish
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths: [ 'shared-models/**' ]
+  pull_request:
+    branches: [ main ]
+    paths: [ 'shared-models/**' ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to generate models from'
+        required: true
+        default: 'local'
+        type: choice
+        options:
+        - local
+        - dev
+        - staging
+        - prod
+      force_publish:
+        description: 'Force publish even if no changes detected'
+        required: false
+        default: false
+        type: boolean
+      version_bump:
+        description: 'Version bump type'
+        required: false
+        default: 'patch'
+        type: choice
+        options:
+        - patch
+        - minor
+        - major
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./shared-models
+    outputs:
+      python-version: ${{ steps.setup-python.outputs.python-version }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      id: setup-python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Cache Python dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/pyproject.toml') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e .[dev]
+        pip install build twine
+    
+    - name: Lint code (if tools available)
+      run: |
+        pip install black isort mypy || true
+        black --check src/ || echo "Black not configured"
+        isort --check-only src/ || echo "isort not configured"
+        mypy src/ || echo "MyPy not configured"
+      continue-on-error: true
+    
+    - name: Run custom test runner
+      run: |
+        python test_runner.py
+    
+    - name: Run pytest with coverage
+      run: |
+        pip install pytest-cov
+        if [ -f "tests/test_document_service_models.py" ]; then
+          PYTHONPATH=src python -m pytest tests/ -v --tb=short --cov=src/shared_models --cov-report=xml --cov-report=term
+        else
+          echo "No pytest tests found, skipping"
+        fi
+      continue-on-error: true
+    
+    - name: Upload coverage to Codecov
+      if: success()
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./shared-models/coverage.xml
+        flags: shared-models
+        name: shared-models-coverage
+      continue-on-error: true
+    
+    - name: Validate package can be built
+      run: |
+        python -m build
+        echo "✅ Package built successfully"
+        ls -la dist/
+    
+    - name: Test package installation
+      run: |
+        # Create a temporary virtual environment
+        python -m venv test_env
+        source test_env/bin/activate
+        
+        # Install the built package
+        pip install dist/*.whl
+        
+        # Test import
+        python -c "
+from shared_models.generated.document_service import Feature, DocumentUpdateRequest
+print('✅ Package imports work correctly')
+feature = Feature(name='Test', type='skill')
+print(f'✅ Feature creation works: {feature.name}')
+"
+        
+        deactivate
+        rm -rf test_env
+        echo "✅ Package installation and import test passed"
+
+  generate-models:
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    defaults:
+      run:
+        working-directory: ./shared-models
+    outputs:
+      has-changes: ${{ steps.changes.outputs.changed }}
+      new-version: ${{ steps.version.outputs.new_version }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e .[dev]
+        pip install httpx requests
+    
+    - name: Generate models from services
+      env:
+        ENVIRONMENT: ${{ github.event.inputs.environment || 'dev' }}
+      run: |
+        echo "Attempting to generate models from $ENVIRONMENT environment..."
+        
+        # Try to generate models from running services
+        if python scripts/generate_models.py --environment $ENVIRONMENT; then
+          echo "✅ Successfully generated models from $ENVIRONMENT services"
+        else
+          echo "⚠️ Service generation failed, using existing models"
+          echo "This is normal if services are not running in $ENVIRONMENT"
+        fi
+    
+    - name: Validate generated models
+      run: |
+        echo "Validating generated models..."
+        python test_runner.py
+        echo "✅ Generated models validation passed"
+    
+    - name: Check for changes
+      id: changes
+      run: |
+        git add -A
+        if [ -n "$(git diff --cached)" ]; then
+          echo "changed=true" >> $GITHUB_OUTPUT
+          echo "📝 Generated models have changes:"
+          git diff --cached --name-only
+        else
+          echo "changed=false" >> $GITHUB_OUTPUT
+          echo "✅ No changes in generated models"
+        fi
+        
+        # Force publish if requested
+        if [ "${{ github.event.inputs.force_publish }}" = "true" ]; then
+          echo "changed=true" >> $GITHUB_OUTPUT
+          echo "🔄 Force publish requested"
+        fi
+    
+    - name: Determine version bump
+      id: version
+      if: steps.changes.outputs.changed == 'true' || github.event.inputs.force_publish == 'true'
+      run: |
+        BUMP_TYPE="${{ github.event.inputs.version_bump || 'patch' }}"
+        
+        python -c "
+import re
+import os
+
+with open('pyproject.toml', 'r') as f:
+    content = f.read()
+
+# Extract current version
+version_match = re.search(r'version = \"([^\"]+)\"', content)
+if version_match:
+    current = version_match.group(1)
+    major, minor, patch = map(int, current.split('.'))
+    
+    bump_type = os.environ.get('BUMP_TYPE', 'patch')
+    if bump_type == 'major':
+        major += 1
+        minor = 0
+        patch = 0
+    elif bump_type == 'minor':
+        minor += 1
+        patch = 0
+    else:  # patch
+        patch += 1
+    
+    new_version = f'{major}.{minor}.{patch}'
+    
+    # Update version in pyproject.toml
+    new_content = re.sub(r'version = \"[^\"]+\"', f'version = \"{new_version}\"', content)
+    
+    with open('pyproject.toml', 'w') as f:
+        f.write(new_content)
+    
+    print(f'Bumped version from {current} to {new_version} ({bump_type})')
+    
+    # Output for GitHub Actions
+    with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+        f.write(f'new_version={new_version}\n')
+        f.write(f'old_version={current}\n')
+else:
+    print('Could not find version in pyproject.toml')
+    exit(1)
+" BUMP_TYPE="$BUMP_TYPE"
+    
+    - name: Commit version bump
+      if: steps.changes.outputs.changed == 'true'
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add pyproject.toml
+        git commit -m "chore: bump version to ${{ steps.version.outputs.new_version }}" || true
+
+  publish:
+    runs-on: ubuntu-latest
+    needs: [test, generate-models]
+    if: needs.generate-models.outputs.has-changes == 'true' && (github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch')
+    defaults:
+      run:
+        working-directory: ./shared-models
+    environment: 
+      name: pypi
+      url: https://pypi.org/p/resume-match-shared-models
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ github.ref }}
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install build dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install build twine
+    
+    - name: Build package
+      run: |
+        echo "Building package version ${{ needs.generate-models.outputs.new-version }}..."
+        python -m build
+        echo "✅ Package built successfully"
+        ls -la dist/
+    
+    - name: Verify package
+      run: |
+        # Check package contents
+        python -m twine check dist/*
+        echo "✅ Package verification passed"
+        
+        # Test installation in clean environment
+        python -m venv verify_env
+        source verify_env/bin/activate
+        pip install dist/*.whl
+        
+        # Test imports
+        python -c "
+from shared_models.generated.document_service import Feature, DocumentUpdateRequest
+print('✅ Package verification: imports work')
+feature = Feature(name='Test', type='skill')
+print(f'✅ Package verification: model creation works ({feature.name})')
+"
+        deactivate
+        rm -rf verify_env
+        echo "✅ Package verification completed"
+    
+    - name: Publish to Test PyPI
+      env:
+        TWINE_USERNAME: __token__
+        TWINE_PASSWORD: ${{ secrets.TEST_PYPI_API_TOKEN }}
+      run: |
+        echo "Publishing to Test PyPI..."
+        twine upload --repository testpypi dist/* --verbose
+        echo "✅ Successfully published to Test PyPI"
+    
+    - name: Test install from Test PyPI
+      run: |
+        echo "Testing installation from Test PyPI..."
+        python -m venv test_pypi_env
+        source test_pypi_env/bin/activate
+        
+        # Wait a bit for package to be available
+        sleep 30
+        
+        # Install from Test PyPI
+        pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ resume-match-shared-models==${{ needs.generate-models.outputs.new-version }}
+        
+        # Test functionality
+        python -c "
+from shared_models.generated.document_service import Feature, DocumentUpdateRequest
+print('✅ Test PyPI install: imports work')
+feature = Feature(name='TestPyPI', type='skill')
+request = DocumentUpdateRequest(file_type='cv', role='Test Role', features=[feature])
+print(f'✅ Test PyPI install: full functionality works')
+print(f'   Feature: {feature.name}')
+print(f'   Request role: {request.role}')
+"
+        deactivate
+        rm -rf test_pypi_env
+        echo "✅ Test PyPI installation verified"
+    
+    - name: Publish to Production PyPI
+      if: github.ref == 'refs/heads/main'
+      env:
+        TWINE_USERNAME: __token__
+        TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+      run: |
+        echo "Publishing to Production PyPI..."
+        twine upload dist/* --verbose
+        echo "✅ Successfully published to Production PyPI"
+    
+    - name: Create GitHub Release
+      if: github.ref == 'refs/heads/main'
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: v${{ needs.generate-models.outputs.new-version }}
+        release_name: Shared Models v${{ needs.generate-models.outputs.new-version }}
+        body: |
+          ## Resume Match Pro - Shared Models v${{ needs.generate-models.outputs.new-version }}
+          
+          Auto-generated release with updated Pydantic models from microservice OpenAPI specifications.
+          
+          ### 📦 Installation
+          ```bash
+          pip install resume-match-shared-models==${{ needs.generate-models.outputs.new-version }}
+          ```
+          
+          ### 🔧 Usage
+          ```python
+          from shared_models.generated.document_service import (
+              DocumentUpdateRequest,
+              Feature,
+              FeatureProperties
+          )
+          
+          # Type-safe model creation
+          feature = Feature(name="Python", type="skill")
+          request = DocumentUpdateRequest(
+              file_type="cv",
+              role="Python Developer", 
+              features=[feature]
+          )
+          ```
+          
+          ### 🎯 Features
+          - ✅ Type-safe Pydantic models
+          - ✅ Auto-generated from live APIs
+          - ✅ Full validation and serialization
+          - ✅ IDE support with auto-completion
+          
+          ### 📋 Generated Models
+          - Document management models from document-service
+          - Feature and FeatureProperties for flexible skill/certification data
+          - Request/response models for API integration
+          
+          ---
+          
+          Generated from: ${{ github.event.inputs.environment || 'dev' }} environment  
+          Commit: ${{ github.sha }}
+        draft: false
+        prerelease: false
+
+  integration-test:
+    runs-on: ubuntu-latest
+    needs: [test, publish]
+    if: needs.publish.result == 'success'
+    
+    steps:
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Test final package installation
+      run: |
+        echo "🧪 Running final integration test..."
+        
+        # Wait for package to be available on PyPI
+        sleep 60
+        
+        # Install from production PyPI
+        pip install resume-match-shared-models==${{ needs.generate-models.outputs.new-version }}
+        
+        # Comprehensive functionality test
+        python -c "
+import json
+from datetime import datetime
+from uuid import uuid4
+from shared_models.generated.document_service import (
+    Feature,
+    FeatureProperties, 
+    DocumentResponse,
+    DocumentUpdateRequest,
+    DocumentListResponse
+)
+
+print('🧪 Integration Test: Creating complex models...')
+
+# Create feature with properties
+feature = Feature(
+    name='Python',
+    type='skill',
+    properties=FeatureProperties(
+        years=5,
+        level='expert',
+        description='Advanced Python development'
+    )
+)
+
+# Create update request
+update_request = DocumentUpdateRequest(
+    file_type='cv',
+    text_content='# John Doe\nSoftware Engineer...',
+    role='Senior Python Developer',
+    features=[feature],
+    metadata={'confidence': 0.95}
+)
+
+# Test serialization
+json_data = update_request.model_dump()
+json_str = update_request.model_dump_json()
+
+# Test deserialization
+restored = DocumentUpdateRequest(**json_data)
+
+print('✅ Integration Test: All functionality working correctly')
+print(f'   ✅ Feature creation: {feature.name} ({feature.type})')
+print(f'   ✅ Complex models: {update_request.role}')
+print(f'   ✅ Serialization: {len(json_str)} chars')
+print(f'   ✅ Deserialization: {restored.role}')
+print(f'   ✅ Validation: {len(restored.features)} features')
+
+print('🎉 Integration test completed successfully!')
+"
+        
+        echo "✅ Final integration test passed!"

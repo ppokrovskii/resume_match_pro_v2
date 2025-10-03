@@ -160,3 +160,4 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             logger.error(f"Rate limiting error: {e}")
             # If rate limiting fails, allow the request to proceed
             return await call_next(request)
+

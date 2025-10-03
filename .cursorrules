@@ -238,18 +238,25 @@ class DocumentUploadRequest(BaseModel):
 
 ## Documentation
 
-### Standards
-- **Keep it short and lean** - essentials only
-- Document public APIs with minimal examples
-- Clear, concise language
-- Critical usage examples only
-- Remove redundant information
+### Approved Document Types (ONLY)
+- **requirements.md** - Business and functional requirements
+- **solution_design.md** - Technical architecture and design
+- **test_plan.md** - Testing strategy and scenarios
+- **README.md** - Essential setup and usage instructions
 
-### API Documentation
-- OpenAPI/Swagger specs
-- Essential request/response examples
-- Brief error response docs
-- Concise integration guides
+### Documentation Standards
+- **NEVER create other documentation files** - stick to the 4 approved types
+- **Keep it short and lean** - essentials only
+- **No workflow docs, implementation summaries, or verbose guides**
+- Clear, concise language with critical examples only
+- Remove redundant information immediately
+
+### What NOT to Document
+- ❌ Workflow setup guides (use README.md for setup)
+- ❌ Implementation summaries or changelogs
+- ❌ Detailed API documentation (use OpenAPI/Swagger)
+- ❌ Step-by-step tutorials (keep in README.md if essential)
+- ❌ Architecture decision records (use solution_design.md)
 
 ## Database Migrations
 

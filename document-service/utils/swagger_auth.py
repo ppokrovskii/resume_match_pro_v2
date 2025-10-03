@@ -19,6 +19,16 @@ def configure_swagger_auth(app: FastAPI):
             routes=app.routes,
         )
         
+        # Add field documentation notes
+        if "components" in openapi_schema and "schemas" in openapi_schema["components"]:
+            # Add note about text_content field format
+            for schema_name, schema in openapi_schema["components"]["schemas"].items():
+                if "text_content" in schema.get("properties", {}):
+                    schema["properties"]["text_content"]["description"] = (
+                        schema["properties"]["text_content"].get("description", "") + 
+                        " (Note: Content should be in markdown format for proper structure preservation)"
+                    )
+        
         openapi_schema["components"]["securitySchemes"] = {
             "BearerAuth": {
                 "type": "http",

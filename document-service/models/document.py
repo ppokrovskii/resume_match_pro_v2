@@ -58,7 +58,7 @@ class Document(BaseModel):
     file_size: int = Field(..., gt=0, description="File size in bytes")
     storage_path: Optional[str] = Field(None, description="Storage path")
     # Values persisted inside doc_metadata for flexibility
-    text_content: Optional[str] = Field(None, description="Extracted text content")
+    text_content: Optional[str] = Field(None, description="Extracted text content (markdown format)")
     role: Optional[str] = Field(None, description="Identified role/position")
     features: Optional[List[Feature]] = Field(None, description="Extracted features")
     metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
@@ -149,8 +149,8 @@ class DocumentUpdateRequest(BaseModel):
     )
     text_content: Optional[str] = Field(
         None, 
-        description="Extracted text content from the document",
-        example="John Doe\nSoftware Engineer\n..."
+        description="Extracted text content from the document (markdown format)",
+        example="# John Doe\n\n## Experience\n\n**Software Engineer** at TechCorp\n- Python development\n- AWS cloud services"
     )
     role: Optional[str] = Field(
         None, 

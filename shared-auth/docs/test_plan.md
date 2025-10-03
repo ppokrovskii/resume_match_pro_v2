@@ -11,7 +11,7 @@
 
 | Test ID | Requirement | Test Case | Priority |
 |---------|-------------|-----------|----------|
-| AUTH-UNIT-001 | Easy Integration | Package installs via `uv add resume-match-shared-auth` | High |
+| AUTH-UNIT-001 | Easy Integration | Package installs via Azure Artifacts | High |
 | AUTH-UNIT-002 | Easy Integration | Auth setup with 3 lines of code | High |
 | AUTH-UNIT-003 | Easy Integration | FastAPI dependency injection works | High |
 | AUTH-UNIT-004 | API Gateway Pattern | JWT token validation with Auth0 JWKS | High |

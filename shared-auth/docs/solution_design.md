@@ -4,7 +4,7 @@
 
 **Purpose**: Reusable Auth0 JWT middleware for FastAPI microservices  
 **Tech Stack**: Python 3.11+, FastAPI, Auth0 JWT  
-**Distribution**: GitHub Packages  
+**Distribution**: Azure Artifacts  
 
 ## Architecture
 
@@ -94,8 +94,8 @@ dependencies = [
 ## Installation
 
 ```bash
-# In microservices
-uv add resume-match-shared-auth
+# In microservices - install from Azure Artifacts
+uv add resume-match-shared-auth --index-url https://pkgs.dev.azure.com/resumematch/_packaging/shared-packages/pypi/simple/
 
 # Local development
 cd shared-auth && uv pip install -e .

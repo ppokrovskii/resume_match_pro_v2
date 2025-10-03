@@ -1,0 +1,1172 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Document Service API",
+    "description": "Pure document storage and management microservice",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/v1/documents/": {
+      "get": {
+        "tags": [
+          "Documents"
+        ],
+        "summary": "List User Documents",
+        "description": "Retrieve a paginated list of documents for the authenticated user.\n\nThis endpoint returns documents owned by the current user with support for:\n- **Filtering** by document type (CV or Job Description)\n- **Pagination** with customizable limit and offset\n- **Ordering** by creation date (newest first)\n\n## Parameters\n\n- **file_type** (optional): Filter documents by type\n    - `cv` - Return only Resume/CV documents\n    - `jd` - Return only Job description documents\n    - *omitted* - Return all document types (default behavior)\n\n- **limit**: Number of documents per page (1-100, default: 50)\n\n- **offset**: Skip this many documents for pagination (default: 0)\n\n## Response\n\nReturns a structured response with:\n- **documents**: Array of document objects with metadata\n- **total_count**: Total number of documents matching the filter\n- **pagination info**: limit, offset, has_more flags\n\n## Examples\n\n- Get all documents: `GET /documents`\n- Get only CV documents: `GET /documents?file_type=cv`\n- Get only job descriptions: `GET /documents?file_type=jd`\n- Get first 10 CV documents: `GET /documents?file_type=cv&limit=10`\n- Get next page of all documents: `GET /documents?limit=10&offset=10`\n\n## Security\n\n- Requires authentication (JWT token)\n- Users can only access their own documents\n- Results are automatically filtered by user ownership",
+        "operationId": "get_documents_api_v1_documents__get",
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "OAuth2": [
+              "read:documents",
+              "write:documents",
+              "delete:documents"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "name": "file_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^(cv|jd)$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by document type. Omit to return all document types.",
+              "examples": {
+                "cv": {
+                  "summary": "CV/Resume documents only",
+                  "value": "cv"
+                },
+                "jd": {
+                  "summary": "Job description documents only",
+                  "value": "jd"
+                },
+                "all": {
+                  "summary": "All document types (default)",
+                  "description": "Omit this parameter to get all document types"
+                }
+              },
+              "title": "File Type"
+            },
+            "description": "Filter by document type. Omit to return all document types."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Maximum number of documents to return per page",
+              "default": 50,
+              "title": "Limit"
+            },
+            "description": "Maximum number of documents to return per page",
+            "example": 10
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Number of documents to skip for pagination",
+              "default": 0,
+              "title": "Offset"
+            },
+            "description": "Number of documents to skip for pagination",
+            "example": 0
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentListResponseModel"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/documents/{document_id}": {
+      "get": {
+        "tags": [
+          "Documents"
+        ],
+        "summary": "Get Document",
+        "description": "Get a specific document by ID\n\n- **document_id**: UUID of the document to retrieve\n\nReturns complete document information including extracted text.",
+        "operationId": "get_document_api_v1_documents__document_id__get",
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "OAuth2": [
+              "read:documents",
+              "write:documents",
+              "delete:documents"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Documents"
+        ],
+        "summary": "Delete Document",
+        "description": "Delete a document and its associated file\n\n- **document_id**: UUID of the document to delete\n\nPermanently removes the document record and file from storage.\nReturns 204 No Content on successful deletion.",
+        "operationId": "delete_document_api_v1_documents__document_id__delete",
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "OAuth2": [
+              "read:documents",
+              "write:documents",
+              "delete:documents"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Documents"
+        ],
+        "summary": "Update Document Metadata",
+        "description": "Update document metadata (for external services)\n\nThis endpoint allows external AI services to update document metadata after processing.\nIt supports updating the following fields:\n\n- **file_type**: Document classification (cv or jd)\n- **text_content**: Extracted text content from the document\n- **role**: Identified job role or position (e.g., \"Python Developer\")\n- **features**: List of extracted features (skills, certifications, etc.)\n- **metadata**: Additional metadata fields\n\n## Request Body\n\nAll fields are optional - only provide the fields you want to update:\n\n```json\n{\n    \"file_type\": \"cv\",\n    \"text_content\": \"John Doe\\nSoftware Engineer\\n...\",\n    \"role\": \"Python Developer\",\n    \"features\": [\n        {\n            \"name\": \"Python\",\n            \"type\": \"skill\",\n            \"properties\": {\"years\": 5, \"level\": \"expert\"}\n        },\n        {\n            \"name\": \"AWS Solutions Architect\",\n            \"type\": \"certification\",\n            \"properties\": {\"grade\": \"A\", \"year_obtained\": 2023}\n        }\n    ],\n    \"metadata\": {\n        \"processing_version\": \"1.2.0\",\n        \"confidence_score\": 0.95\n    }\n}\n```\n\n## Features Structure\n\nFeatures support flexible NoSQL structure with:\n- **name**: Feature/skill name\n- **type**: Feature type (skill, certification, language, tool, etc.)\n- **properties**: Flexible key-value properties specific to the feature type\n\n## Authentication\n\n- Requires valid JWT token\n- Only authorized external services can update documents\n- Users can only update their own documents\n\n## Events\n\n- Publishes `document.updated` event to Azure Service Bus after successful update\n- Event contains complete updated document data for AI matching service\n\n## Response\n\nReturns success status and updated document ID on successful update.",
+        "operationId": "update_document_metadata_api_v1_documents__document_id__put",
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "OAuth2": [
+              "read:documents",
+              "write:documents",
+              "delete:documents"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DocumentUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentUpdateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/documents/{document_id}/download": {
+      "get": {
+        "tags": [
+          "Documents",
+          "Documents"
+        ],
+        "summary": "Download Document File",
+        "description": "Download the original document file as uploaded by the user",
+        "operationId": "download_document_api_v1_documents__document_id__download_get",
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "OAuth2": [
+              "read:documents",
+              "write:documents",
+              "delete:documents"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Document file downloaded successfully",
+            "content": {
+              "application/json": {
+                "schema": {}
+              },
+              "application/pdf": {
+                "example": "Binary PDF content"
+              },
+              "application/vnd.openxmlformats-officedocument.wordprocessingml.document": {
+                "example": "Binary DOCX content"
+              },
+              "application/msword": {
+                "example": "Binary DOC content"
+              }
+            },
+            "headers": {
+              "Content-Disposition": {
+                "description": "Attachment with original filename",
+                "schema": {
+                  "type": "string"
+                },
+                "example": "attachment; filename=resume.pdf"
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": "Not authenticated"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Document not found or access denied",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "error": {
+                    "code": "DOCUMENT_NOT_FOUND",
+                    "message": "Document not found"
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error during download",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "error": {
+                    "code": "DOWNLOAD_FAILED",
+                    "message": "Failed to download document"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/documents/upload": {
+      "post": {
+        "tags": [
+          "Documents"
+        ],
+        "summary": "Upload Documents",
+        "description": "Upload documents (single or multiple files)\n\n- **files**: Array of document files (PDF, DOC, DOCX) - 1 to 100 files, up to 16MB each\n\nPure storage service - files are stored as-is without processing.\nPublishes document.uploaded event for external text extraction service.\n\nFrontend can send single file as array with one element: [file]",
+        "operationId": "upload_documents_api_v1_documents_upload_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_documents_api_v1_documents_upload_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkUploadResponseModel"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "OAuth2": [
+              "read:documents",
+              "write:documents",
+              "delete:documents"
+            ]
+          }
+        ]
+      }
+    },
+    "/health/check": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "summary": "Health Check",
+        "description": "Comprehensive health check endpoint\n\nReturns the health status of all service components:\n- Database connectivity\n- Storage service availability\n- Overall service health",
+        "operationId": "health_check_health_check_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health/": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "summary": "Health Check",
+        "description": "Comprehensive health check endpoint\n\nReturns the health status of all service components:\n- Database connectivity\n- Storage service availability\n- Overall service health",
+        "operationId": "health_check_health__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/swagger-token": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Get Token for Swagger UI",
+        "description": "Proxy endpoint for Swagger UI to get Auth0 tokens\n\nHandles both Authorization header (Basic Auth) and form data for client credentials.\nThis endpoint converts Swagger UI's form-encoded request to Auth0's JSON format.",
+        "operationId": "get_swagger_token_auth_swagger_token_post",
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_get_swagger_token_auth_swagger_token_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Body_get_swagger_token_auth_swagger_token_post": {
+        "properties": {
+          "grant_type": {
+            "type": "string",
+            "title": "Grant Type"
+          },
+          "scope": {
+            "type": "string",
+            "title": "Scope"
+          },
+          "audience": {
+            "type": "string",
+            "title": "Audience"
+          }
+        },
+        "type": "object",
+        "required": [
+          "grant_type",
+          "scope"
+        ],
+        "title": "Body_get_swagger_token_auth_swagger_token_post"
+      },
+      "Body_upload_documents_api_v1_documents_upload_post": {
+        "properties": {
+          "files": {
+            "items": {
+              "type": "string",
+              "format": "binary"
+            },
+            "type": "array",
+            "title": "Files",
+            "description": "Document files to upload (1-100 files)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "files"
+        ],
+        "title": "Body_upload_documents_api_v1_documents_upload_post"
+      },
+      "BulkUploadResponse": {
+        "properties": {
+          "total_files": {
+            "type": "integer",
+            "title": "Total Files",
+            "description": "Total number of files processed"
+          },
+          "successful_uploads": {
+            "type": "integer",
+            "title": "Successful Uploads",
+            "description": "Number of successful uploads"
+          },
+          "failed_uploads": {
+            "type": "integer",
+            "title": "Failed Uploads",
+            "description": "Number of failed uploads"
+          },
+          "results": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Results",
+            "description": "Individual file results"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_files",
+          "successful_uploads",
+          "failed_uploads",
+          "results"
+        ],
+        "title": "BulkUploadResponse",
+        "description": "Bulk upload response model"
+      },
+      "BulkUploadResponseModel": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "data": {
+            "$ref": "#/components/schemas/BulkUploadResponse"
+          },
+          "meta": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Meta"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "data",
+          "meta"
+        ],
+        "title": "BulkUploadResponseModel"
+      },
+      "Document": {
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id",
+            "description": "Document ID"
+          },
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "User Id",
+            "description": "User ID who uploaded the document"
+          },
+          "organization_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization Id",
+            "description": "Organization ID"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename",
+            "description": "Original filename"
+          },
+          "file_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Type",
+            "description": "Document type (determined by external services)"
+          },
+          "content_type": {
+            "type": "string",
+            "title": "Content Type",
+            "description": "MIME type"
+          },
+          "file_size": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "File Size",
+            "description": "File size in bytes"
+          },
+          "storage_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Storage Path",
+            "description": "Storage path"
+          },
+          "text_content": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text Content",
+            "description": "Extracted text content (markdown format) (Note: Content should be in markdown format for proper structure preservation)"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role",
+            "description": "Identified role/position"
+          },
+          "features": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/Feature"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Features",
+            "description": "Extracted features"
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Metadata",
+            "description": "Additional metadata"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At",
+            "description": "Creation timestamp"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At",
+            "description": "Last update timestamp"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "filename",
+          "content_type",
+          "file_size"
+        ],
+        "title": "Document",
+        "description": "Document model"
+      },
+      "DocumentListResponse": {
+        "properties": {
+          "documents": {
+            "items": {
+              "$ref": "#/components/schemas/Document"
+            },
+            "type": "array",
+            "title": "Documents",
+            "description": "List of documents",
+            "example": [
+              {
+                "content_type": "application/pdf",
+                "created_at": "2024-01-15T10:30:00Z",
+                "file_size": 1024000,
+                "file_type": "cv",
+                "filename": "john_doe_resume.pdf",
+                "id": "123e4567-e89b-12d3-a456-426614174000",
+                "metadata": {
+                  "original_filename": "john_doe_resume.pdf"
+                },
+                "storage_path": "documents/user123/cvs/john_doe_resume.pdf",
+                "updated_at": "2024-01-15T10:30:00Z",
+                "user_id": "987fcdeb-51a2-43d1-9f12-345678901234"
+              }
+            ]
+          },
+          "total_count": {
+            "type": "integer",
+            "title": "Total Count",
+            "description": "Total number of documents",
+            "example": 25
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit",
+            "description": "Limit per page",
+            "example": 10
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset",
+            "description": "Offset for pagination",
+            "example": 0
+          },
+          "has_more": {
+            "type": "boolean",
+            "title": "Has More",
+            "description": "Whether there are more documents",
+            "example": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "documents",
+          "total_count",
+          "limit",
+          "offset",
+          "has_more"
+        ],
+        "title": "DocumentListResponse",
+        "description": "Document list response model"
+      },
+      "DocumentListResponseModel": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "description": "Indicates if the request was successful",
+            "example": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/DocumentListResponse",
+            "description": "Document list data"
+          },
+          "meta": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Meta",
+            "description": "Metadata about the request",
+            "example": {
+              "endpoint": "documents.get_documents",
+              "method": "GET",
+              "service": "document-service"
+            }
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "data",
+          "meta"
+        ],
+        "title": "DocumentListResponseModel"
+      },
+      "DocumentResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "data": {
+            "$ref": "#/components/schemas/Document"
+          },
+          "meta": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Meta"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "data",
+          "meta"
+        ],
+        "title": "DocumentResponse"
+      },
+      "DocumentUpdateRequest": {
+        "properties": {
+          "file_type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(cv|jd)$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Type",
+            "description": "Document type classification",
+            "example": "cv"
+          },
+          "text_content": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text Content",
+            "description": "Extracted text content from the document (markdown format) (Note: Content should be in markdown format for proper structure preservation)",
+            "example": "# John Doe\n\n## Experience\n\n**Software Engineer** at TechCorp\n- Python development\n- AWS cloud services"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role",
+            "description": "Identified job role or position",
+            "example": "Python Developer"
+          },
+          "features": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/Feature"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Features",
+            "description": "List of extracted features (skills, certifications, etc.)",
+            "example": [
+              {
+                "name": "Python",
+                "properties": {
+                  "years": 5,
+                  "level": "expert"
+                },
+                "type": "skill"
+              },
+              {
+                "name": "AWS Solutions Architect",
+                "properties": {
+                  "grade": "A",
+                  "year_obtained": 2023
+                },
+                "type": "certification"
+              }
+            ]
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata",
+            "description": "Additional metadata fields",
+            "example": {
+              "confidence_score": 0.95,
+              "processing_version": "1.2.0"
+            }
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "DocumentUpdateRequest",
+        "description": "Document update request model for external services"
+      },
+      "DocumentUpdateResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "description": "Update success status"
+          },
+          "data": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Data",
+            "description": "Update result data"
+          },
+          "meta": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Meta",
+            "description": "Response metadata"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "data",
+          "meta"
+        ],
+        "title": "DocumentUpdateResponse",
+        "description": "Document update response model"
+      },
+      "Feature": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the feature (e.g., 'Python', 'AWS Certified')"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type",
+            "description": "Type of the feature (e.g., 'skill', 'certification')"
+          },
+          "properties": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FeatureProperties"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Additional properties for the feature"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "type"
+        ],
+        "title": "Feature",
+        "description": "Document feature model (e.g., skill, certification)"
+      },
+      "FeatureProperties": {
+        "properties": {},
+        "additionalProperties": true,
+        "type": "object",
+        "title": "FeatureProperties",
+        "description": "Properties for a document feature"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HealthResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "data": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Data"
+          },
+          "meta": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Meta"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "data",
+          "meta"
+        ],
+        "title": "HealthResponse"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    },
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "JWT Bearer Token from Auth0"
+      },
+      "OAuth2": {
+        "type": "oauth2",
+        "description": "Auth0 OAuth2 via proxy endpoint",
+        "flows": {
+          "clientCredentials": {
+            "tokenUrl": "/auth/swagger-token",
+            "scopes": {
+              "read:documents": "Read documents",
+              "write:documents": "Create and update documents",
+              "delete:documents": "Delete documents"
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -88,16 +88,12 @@ paths:
 ## 📦 **Package Publishing**
 
 ### **Where Packages Go**
-- **PyPI**: `pip install resume-match-shared-auth`
-- **GitHub Packages**: Configure pip to use GitHub registry
+- **Azure Artifacts**: `pip install resume-match-shared-auth --index-url https://pkgs.dev.azure.com/resumematch/_packaging/shared-packages/pypi/simple/`
 
 ### **Installation After Publishing**
 ```bash
-# From PyPI
-pip install resume-match-shared-auth==0.1.0
-
-# From GitHub Packages  
-pip install --index-url https://pypi.org/simple/ resume-match-shared-auth==0.1.0
+# From Azure Artifacts
+pip install resume-match-shared-auth==0.1.0 --index-url https://pkgs.dev.azure.com/resumematch/_packaging/shared-packages/pypi/simple/
 ```
 
 ## ✅ **Next Steps**

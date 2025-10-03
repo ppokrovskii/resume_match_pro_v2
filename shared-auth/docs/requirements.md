@@ -11,7 +11,7 @@ Reusable Auth0 JWT middleware for all Resume Match Pro microservices. Eliminates
 **So that** I can focus on business logic
 
 **Acceptance Criteria:**
-- ✅ Install via `uv add resume-match-shared-auth`
+- ✅ Install via `uv add resume-match-shared-auth --index-url https://pkgs.dev.azure.com/resumematch/_packaging/shared-packages/pypi/simple/`
 - ✅ Setup requires max 3 lines of code
 - ✅ FastAPI dependency injection out of the box
 - ✅ No manual JWT/JWKS implementation needed

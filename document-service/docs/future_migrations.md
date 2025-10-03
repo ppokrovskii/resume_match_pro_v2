@@ -42,3 +42,4 @@ The following columns in the `documents` table are no longer used after the AI/t
 
 ### Planned
 - 🔄 Remove `processing_status` and `processing_error` columns (v1.1.0)
+

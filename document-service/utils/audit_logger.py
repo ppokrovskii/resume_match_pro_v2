@@ -243,3 +243,4 @@ def audit_document_update(document_id: UUID, user_id: UUID, changes: Dict[str, A
 def audit_document_delete(document_id: UUID, user_id: UUID, request: Request = None, success: bool = True, error: str = None):
     """Convenience function for document delete audit logging"""
     AuditLogger.log_document_delete(document_id, user_id, request, success, error)
+

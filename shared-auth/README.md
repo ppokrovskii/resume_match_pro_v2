@@ -23,11 +23,11 @@ Reusable Auth0 JWT middleware for Resume Match Pro microservices. Provides consi
 ### Installation
 
 ```bash
-# Using uv (recommended)
-uv add resume-match-shared-auth
+# Using uv (recommended) - from Azure Artifacts
+uv add resume-match-shared-auth --index-url https://pkgs.dev.azure.com/resumematch/_packaging/shared-packages/pypi/simple/
 
-# Using pip
-pip install resume-match-shared-auth
+# Using pip - from Azure Artifacts
+pip install resume-match-shared-auth --index-url https://pkgs.dev.azure.com/resumematch/_packaging/shared-packages/pypi/simple/
 ```
 
 ### API Gateway Usage (Full JWT Validation)
