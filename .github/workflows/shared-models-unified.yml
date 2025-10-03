@@ -2,10 +2,10 @@ name: Shared Models - CI/CD Pipeline
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main, develop, dev ]
     paths: [ 'shared-models/**' ]
   pull_request:
-    branches: [ main, develop ]
+    branches: [ main, develop, dev ]
     paths: [ 'shared-models/**' ]
   workflow_dispatch:
     inputs:
