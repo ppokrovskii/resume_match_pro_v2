@@ -1,47 +1,20 @@
-name: Shared Models - CI/CD Pipeline
+name: Shared Models - Release
 
 on:
   push:
-    branches: [ main, develop, dev ]
+    branches: [ dev ]
     paths: [ 'shared-models/**' ]
-  pull_request:
-    branches: [ main, develop, dev ]
-    paths: [ 'shared-models/**' ]
-  workflow_dispatch:
-    inputs:
-      environment:
-        description: 'Environment to generate models from'
-        required: true
-        default: 'local'
-        type: choice
-        options:
-        - local
-        - dev
-        - staging
-        - prod
-      force_publish:
-        description: 'Force publish even if no changes detected'
-        required: false
-        default: false
-        type: boolean
 
 jobs:
-  # Always run tests and validation
-  test-and-validate:
+  test-and-publish:
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: ./shared-models
     
-    outputs:
-      should-publish: ${{ steps.check-publish.outputs.should-publish }}
-      version: ${{ steps.check-publish.outputs.version }}
-    
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      with:
-        fetch-depth: 0  # Need full history for version bumping
     
     - name: Set up Python
       uses: actions/setup-python@v4
@@ -56,197 +29,21 @@ jobs:
     - name: Install dependencies
       run: uv pip install --system -e ".[dev]"
     
-    # Code Quality Checks
-    - name: Check code formatting with black
-      run: uv run black --check src/ tests/ scripts/
+    # Quick validation
+    - name: Run tests
+      run: uv run pytest tests/ --cov=src --cov-report=xml
     
-    - name: Check import sorting with isort  
-      run: uv run isort --check-only src/ tests/ scripts/
-    
-    - name: Type checking with mypy
-      run: uv run mypy src/ --ignore-missing-imports
-      continue-on-error: true  # Don't fail the build on type issues initially
-    
-    # Model Validation
-    - name: Validate existing models
-      run: uv run python test_runner.py
-    
-    # Comprehensive Testing
-    - name: Run all tests with coverage
-      run: uv run pytest tests/ --cov=src --cov-report=xml --cov-report=html
-    
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
-      with:
-        file: ./shared-models/coverage.xml
-        flags: shared-models
-        fail_ci_if_error: false
-    
-    # Package Building and Validation
-    - name: Build package
-      run: uv build
-    
-    - name: Test package installation
+    - name: Check formatting
       run: |
-        cd /tmp
-        uv pip install --system $GITHUB_WORKSPACE/shared-models/dist/*.whl
-        python -c "
-        try:
-            from shared_models.generated.document_service import DocumentResponse, Feature
-            print('✅ Package installation successful')
-            print('✅ Models can be imported correctly')
-        except Exception as e:
-            print(f'❌ Package installation failed: {e}')
-            exit(1)
-        "
-    
-    # Determine if we should publish (only on main/develop pushes, not PRs)
-    - name: Check if should publish
-      id: check-publish
-      run: |
-        if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-          echo "should-publish=false" >> $GITHUB_OUTPUT
-          echo "version=pr-validation" >> $GITHUB_OUTPUT
-          echo "🔍 Pull Request - Skipping publish"
-        elif [[ "${{ github.ref }}" == "refs/heads/main" || "${{ github.ref }}" == "refs/heads/develop" || "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-          echo "should-publish=true" >> $GITHUB_OUTPUT
-          # Simple version bumping - could be made more sophisticated
-          current_version=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")
-          echo "version=${current_version}" >> $GITHUB_OUTPUT
-          echo "🚀 Push to main/develop - Will publish"
-        else
-          echo "should-publish=false" >> $GITHUB_OUTPUT
-          echo "version=unknown" >> $GITHUB_OUTPUT
-          echo "ℹ️ Other event - Skipping publish"
-        fi
-    
-    # PR-specific validations
-    - name: Check for potential breaking changes (PR only)
-      if: github.event_name == 'pull_request'
-      run: |
-        echo "🔍 Checking for potential breaking changes..."
-        # Compare with main branch models
-        git fetch origin main
-        if git diff --name-only origin/main...HEAD | grep -q "src/shared_models/"; then
-          echo "⚠️ Models have been modified - ensure backward compatibility"
-          echo "📋 Modified files:"
-          git diff --name-only origin/main...HEAD | grep "src/shared_models/" || true
-        else
-          echo "✅ No model changes detected"
-        fi
-    
-    - name: Generate PR summary (PR only)
-      if: github.event_name == 'pull_request'
-      run: |
-        echo "## 🧪 Shared Models Test Results" >> $GITHUB_STEP_SUMMARY
-        echo "- ✅ Code formatting: Passed" >> $GITHUB_STEP_SUMMARY
-        echo "- ✅ Import sorting: Passed" >> $GITHUB_STEP_SUMMARY
-        echo "- ✅ Model validation: Passed" >> $GITHUB_STEP_SUMMARY
-        echo "- ✅ All tests: Passed" >> $GITHUB_STEP_SUMMARY
-        echo "- ✅ Package building: Passed" >> $GITHUB_STEP_SUMMARY
-        echo "- ✅ Installation test: Passed" >> $GITHUB_STEP_SUMMARY
-
-  # Only run generation and publishing on pushes to main/develop or manual trigger
-  generate-and-publish:
-    needs: test-and-validate
-    if: needs.test-and-validate.outputs.should-publish == 'true'
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./shared-models
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-        token: ${{ secrets.GITHUB_TOKEN }}
-    
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
-    
-    - name: Install uv
-      run: |
-        curl -LsSf https://astral.sh/uv/install.sh | sh
-        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-    
-    - name: Install dependencies
-      run: uv pip install --system -e ".[dev]"
-    
-    # Try to generate fresh models from running services
-    - name: Generate models from services
-      env:
-        ENVIRONMENT: ${{ github.event.inputs.environment || 'local' }}
-      run: |
-        echo "🔄 Attempting to generate models from $ENVIRONMENT environment..."
-        
-        # Try to generate from live services, fall back to existing if services unavailable
-        if uv run python scripts/generate_models.py --environment $ENVIRONMENT; then
-          echo "✅ Successfully generated models from live services"
-          models_generated=true
-        else
-          echo "⚠️ Could not reach live services, using existing models"
-          models_generated=false
-        fi
-        
-        # Check if models actually changed
-        if git diff --quiet src/shared_models/generated/; then
-          echo "ℹ️ No model changes detected"
-          echo "models_changed=false" >> $GITHUB_ENV
-        else
-          echo "🔄 Model changes detected"
-          echo "models_changed=true" >> $GITHUB_ENV
-          git add src/shared_models/generated/
-        fi
-    
-    # Version bumping and committing (only if models changed or forced)
-    - name: Bump version and commit
-      if: env.models_changed == 'true' || github.event.inputs.force_publish == 'true'
-      run: |
-        # Simple version bump - patch version
-        python -c "
-        import tomllib
-        import tomli_w
-        
-        with open('pyproject.toml', 'rb') as f:
-            data = tomllib.load(f)
-        
-        version_parts = data['project']['version'].split('.')
-        version_parts[2] = str(int(version_parts[2]) + 1)
-        new_version = '.'.join(version_parts)
-        
-        data['project']['version'] = new_version
-        
-        with open('pyproject.toml', 'wb') as f:
-            tomli_w.dump(data, f)
-        
-        print(f'Bumped version to {new_version}')
-        "
-        
-        # Commit changes
-        git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
-        git add pyproject.toml
-        git commit -m "🤖 Auto-update models and bump version [skip ci]" || echo "No changes to commit"
-        git push
+        uv run black --check src/ tests/ scripts/
+        uv run isort --check-only src/ tests/ scripts/
     
     # Build and publish
     - name: Build package
       run: uv build
     
-    - name: Verify package
-      run: |
-        uv run twine check dist/*
-        echo "📦 Package verification passed"
-    
-    # Configure Azure Artifacts authentication
     - name: Configure Azure Artifacts
       run: |
-        echo "🔧 Configuring Azure Artifacts authentication..."
-        
-        # Create .pypirc file for Azure Artifacts
         cat > ~/.pypirc << EOF
         [distutils]
         index-servers = python_packages
@@ -256,99 +53,11 @@ jobs:
         username = ${{ secrets.AZURE_ARTIFACTS_USERNAME }}
         password = ${{ secrets.AZURE_ARTIFACTS_PASSWORD }}
         EOF
-        
-        echo "✅ Azure Artifacts configuration complete"
     
-    # Publish to Azure Artifacts (develop branch for staging)
-    - name: Publish to Azure Artifacts (Staging)
-      if: github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/dev'
+    - name: Publish to Azure Artifacts
       env:
         TWINE_USERNAME: ${{ secrets.AZURE_ARTIFACTS_USERNAME }}
         TWINE_PASSWORD: ${{ secrets.AZURE_ARTIFACTS_PASSWORD }}
       run: |
-        echo "📦 Publishing to Azure Artifacts (Staging)..."
         uv run twine upload --repository python_packages dist/* --verbose
-        echo "✅ Successfully published to Azure Artifacts staging"
-    
-    # Test installation from Azure Artifacts (staging)
-    - name: Test installation from Azure Artifacts (Staging)
-      if: github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/dev'
-      run: |
-        echo "🧪 Testing installation from Azure Artifacts..."
-        sleep 30  # Wait for package to be available
-        cd /tmp
-        
-        # Configure pip to use Azure Artifacts
-        pip config set global.index-url https://pkgs.dev.azure.com/ppokrovskii/resume_match_pro_v2/_packaging/python_packages/pypi/simple/
-        pip config set global.extra-index-url https://pypi.org/simple/
-        
-        # Install with authentication
-        pip install --index-url https://${{ secrets.AZURE_ARTIFACTS_USERNAME }}:${{ secrets.AZURE_ARTIFACTS_PASSWORD }}@pkgs.dev.azure.com/ppokrovskii/resume_match_pro_v2/_packaging/python_packages/pypi/simple/ --extra-index-url https://pypi.org/simple/ resume-match-shared-models
-        
-        python -c "
-        from shared_models.generated.document_service import DocumentResponse
-        print('✅ Azure Artifacts installation successful')
-        "
-    
-    # Publish to Azure Artifacts (main branch for production)
-    - name: Publish to Azure Artifacts (Production)
-      if: github.ref == 'refs/heads/main'
-      env:
-        TWINE_USERNAME: ${{ secrets.AZURE_ARTIFACTS_USERNAME }}
-        TWINE_PASSWORD: ${{ secrets.AZURE_ARTIFACTS_PASSWORD }}
-      run: |
-        echo "🚀 Publishing to Azure Artifacts (Production)..."
-        uv run twine upload --repository python_packages dist/* --verbose
-        echo "✅ Successfully published to Azure Artifacts production"
-    
-    # Create GitHub Release (only from main branch)
-    - name: Create GitHub Release
-      if: github.ref == 'refs/heads/main'
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        version=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")
-        
-        gh release create "shared-models-v${version}" \
-          --title "Shared Models v${version}" \
-          --notes "🤖 Auto-generated release for shared-models v${version}
-        
-        ## 📦 Installation
-        \`\`\`bash
-        # Configure pip for Azure Artifacts
-        pip config set global.index-url https://pkgs.dev.azure.com/ppokrovskii/resume_match_pro_v2/_packaging/python_packages/pypi/simple/
-        pip config set global.extra-index-url https://pypi.org/simple/
-        
-        # Install the package (requires Azure DevOps authentication)
-        pip install resume-match-shared-models==${version}
-        \`\`\`
-        
-        ## 🔄 Changes
-        - Auto-updated models from microservice APIs
-        - Generated from OpenAPI specifications
-        
-        ## 📋 Package Contents
-        - Document Service models
-        - Base classes and mixins
-        - Type-safe Pydantic models
-        " \
-          dist/*
-    
-    - name: Deployment Summary
-      run: |
-        version=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")
-        echo "## 🚀 Deployment Summary" >> $GITHUB_STEP_SUMMARY
-        echo "- 📦 Version: ${version}" >> $GITHUB_STEP_SUMMARY
-        
-        if [[ "${{ github.ref }}" == "refs/heads/develop" || "${{ github.ref }}" == "refs/heads/dev" ]]; then
-          echo "- 🧪 Azure Artifacts (Staging): ✅ Published" >> $GITHUB_STEP_SUMMARY
-          echo "- 🏭 Azure Artifacts (Production): ⏸️ Skipped (not main branch)" >> $GITHUB_STEP_SUMMARY
-        elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
-          echo "- 🧪 Azure Artifacts (Staging): ⏸️ Skipped (main branch)" >> $GITHUB_STEP_SUMMARY
-          echo "- 🏭 Azure Artifacts (Production): ✅ Published" >> $GITHUB_STEP_SUMMARY
-          echo "- 🏷️ GitHub Release: ✅ Created" >> $GITHUB_STEP_SUMMARY
-        else
-          echo "- 🧪 Azure Artifacts (Staging): ⏸️ Skipped" >> $GITHUB_STEP_SUMMARY
-          echo "- 🏭 Azure Artifacts (Production): ⏸️ Skipped" >> $GITHUB_STEP_SUMMARY
-          echo "- 🏷️ GitHub Release: ⏸️ Skipped" >> $GITHUB_STEP_SUMMARY
-        fi
+        echo "✅ Published to Azure Artifacts"

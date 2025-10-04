@@ -2,6 +2,8 @@
 
 Auto-generated Pydantic models from microservice OpenAPI specifications for Resume Match Pro.
 
+*Updated for dev branch auto-publishing workflow*
+
 ## Overview
 
 This package provides type-safe Python models automatically generated from the OpenAPI specifications of Resume Match Pro microservices. It ensures API compatibility and type safety across all services while maintaining a single source of truth for data structures.
@@ -98,12 +100,7 @@ shared-models/
 
 ## CI/CD Integration
 
-Models are automatically updated when service APIs change:
-
-1. Service deploys → OpenAPI spec becomes available
-2. Shared-models CI fetches spec → generates models  
-3. Tests pass → publishes to Azure Artifacts
-4. Consumer services update dependency
+Simple workflow: Push to dev branch → automatic publishing to Azure Artifacts.
 
 ### GitHub Workflow Setup
 
@@ -112,9 +109,7 @@ Required secrets in repository settings:
 - `AZURE_ARTIFACTS_PASSWORD` - Azure DevOps Personal Access Token with Packaging (Read & Write) permissions
 
 Workflow behavior:
-- **PRs**: Validation and testing only
-- **Push to develop/dev**: Azure Artifacts staging publishing  
-- **Push to main**: Azure Artifacts production release with GitHub release
+- **Push to dev**: Runs tests, builds package, publishes to Azure Artifacts
 
 ### Azure DevOps Setup
 
@@ -143,4 +138,6 @@ Workflow behavior:
 
 ## License
 
-MIT License - see LICENSE file for details.
+Proprietary - All Rights Reserved
+
+This software is proprietary and confidential. Unauthorized copying, distribution, or use of this software, via any medium, is strictly prohibited without the express written permission of the copyright holder.
