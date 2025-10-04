@@ -104,8 +104,12 @@ Simple workflow: Push to dev branch → automatic publishing to Azure Artifacts.
 
 ### GitHub Workflow Setup
 
-Required secrets in repository settings:
-- `AZURE_ARTIFACTS_TOKEN` - Azure DevOps Personal Access Token with Packaging (Read & Write) permissions
+Required configuration:
+1. **GitHub Environment**: Create a `dev` environment in repository settings
+2. **Environment Secret**: Add `AZURE_ARTIFACTS_TOKEN` to the `dev` environment
+   - Go to Settings → Environments → `dev` → Add Secret
+   - Name: `AZURE_ARTIFACTS_TOKEN`
+   - Value: Your Azure DevOps Personal Access Token with Packaging (Read & Write) permissions
 
 Workflow behavior:
 - **Push to dev**: Runs tests, builds package, publishes to Azure Artifacts
