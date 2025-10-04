@@ -175,21 +175,26 @@ jobs:
     - name: Publish to Azure Artifacts
       if: github.event.inputs.skip_publish != 'true'
       env:
-        TWINE_USERNAME: __token__
-        TWINE_PASSWORD: ${{ secrets.AZURE_ARTIFACTS_TOKEN }}
+        AZURE_ARTIFACTS_USERNAME: ${{ secrets.AZURE_ARTIFACTS_USERNAME }}
+        AZURE_ARTIFACTS_PAT: ${{ secrets.AZURE_ARTIFACTS_PAT }}
       run: |
+        if [ -z "$AZURE_ARTIFACTS_USERNAME" ] || [ -z "$AZURE_ARTIFACTS_PAT" ]; then
+          echo "Azure Artifacts credentials not provided. Set AZURE_ARTIFACTS_USERNAME and AZURE_ARTIFACTS_PAT secrets."
+          exit 1
+        fi
         echo "Configuring Azure Artifacts credentials..."
-        cat <<'EOF' > ~/.pypirc
-        [distutils]
-        index-servers = py_feed
+        cat <<EOF > ~/.pypirc
+[distutils]
+index-servers =
+  python_packages
 
-        [py_feed]
-        repository = https://pkgs.dev.azure.com/resumematchproV2/rmp_v2_nonprod/_packaging/py_feed/pypi/upload/
-        username = __token__
-        password = ${{ secrets.AZURE_ARTIFACTS_TOKEN }}
-        EOF
+[python_packages]
+repository = https://pkgs.dev.azure.com/ppokrovskii/resume_match_pro_v2/_packaging/python_packages/pypi/upload/
+username = ${AZURE_ARTIFACTS_USERNAME}
+password = ${AZURE_ARTIFACTS_PAT}
+EOF
         echo "Uploading to Azure Artifacts feed..."
-        uv run twine upload --repository py_feed dist/*
+        uv run twine upload --repository python_packages dist/*
     
     - name: Commit version files
       run: |

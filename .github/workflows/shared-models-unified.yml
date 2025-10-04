@@ -241,33 +241,65 @@ jobs:
         uv run twine check dist/*
         echo "📦 Package verification passed"
     
-    # Publish to Test PyPI first
-    - name: Publish to Test PyPI
-      env:
-        TWINE_USERNAME: __token__
-        TWINE_PASSWORD: ${{ secrets.TEST_PYPI_API_TOKEN }}
+    # Configure Azure Artifacts authentication
+    - name: Configure Azure Artifacts
       run: |
-        uv run twine upload --repository testpypi dist/* --verbose
+        echo "🔧 Configuring Azure Artifacts authentication..."
+        
+        # Create .pypirc file for Azure Artifacts
+        cat > ~/.pypirc << EOF
+        [distutils]
+        index-servers = python_packages
+        
+        [python_packages]
+        repository = https://pkgs.dev.azure.com/ppokrovskii/resume_match_pro_v2/_packaging/python_packages/pypi/upload/
+        username = ${{ secrets.AZURE_ARTIFACTS_USERNAME }}
+        password = ${{ secrets.AZURE_ARTIFACTS_PASSWORD }}
+        EOF
+        
+        echo "✅ Azure Artifacts configuration complete"
     
-    # Test installation from Test PyPI
-    - name: Test installation from Test PyPI
+    # Publish to Azure Artifacts (develop branch for staging)
+    - name: Publish to Azure Artifacts (Staging)
+      if: github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/dev'
+      env:
+        TWINE_USERNAME: ${{ secrets.AZURE_ARTIFACTS_USERNAME }}
+        TWINE_PASSWORD: ${{ secrets.AZURE_ARTIFACTS_PASSWORD }}
       run: |
+        echo "📦 Publishing to Azure Artifacts (Staging)..."
+        uv run twine upload --repository python_packages dist/* --verbose
+        echo "✅ Successfully published to Azure Artifacts staging"
+    
+    # Test installation from Azure Artifacts (staging)
+    - name: Test installation from Azure Artifacts (Staging)
+      if: github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/dev'
+      run: |
+        echo "🧪 Testing installation from Azure Artifacts..."
         sleep 30  # Wait for package to be available
         cd /tmp
-        uv pip install --system --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ resume-match-shared-models
+        
+        # Configure pip to use Azure Artifacts
+        pip config set global.index-url https://pkgs.dev.azure.com/ppokrovskii/resume_match_pro_v2/_packaging/python_packages/pypi/simple/
+        pip config set global.extra-index-url https://pypi.org/simple/
+        
+        # Install with authentication
+        pip install --index-url https://${{ secrets.AZURE_ARTIFACTS_USERNAME }}:${{ secrets.AZURE_ARTIFACTS_PASSWORD }}@pkgs.dev.azure.com/ppokrovskii/resume_match_pro_v2/_packaging/python_packages/pypi/simple/ --extra-index-url https://pypi.org/simple/ resume-match-shared-models
+        
         python -c "
         from shared_models.generated.document_service import DocumentResponse
-        print('✅ Test PyPI installation successful')
+        print('✅ Azure Artifacts installation successful')
         "
     
-    # Publish to Production PyPI (only from main branch)
-    - name: Publish to Production PyPI
+    # Publish to Azure Artifacts (main branch for production)
+    - name: Publish to Azure Artifacts (Production)
       if: github.ref == 'refs/heads/main'
       env:
-        TWINE_USERNAME: __token__
-        TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+        TWINE_USERNAME: ${{ secrets.AZURE_ARTIFACTS_USERNAME }}
+        TWINE_PASSWORD: ${{ secrets.AZURE_ARTIFACTS_PASSWORD }}
       run: |
-        uv run twine upload dist/* --verbose
+        echo "🚀 Publishing to Azure Artifacts (Production)..."
+        uv run twine upload --repository python_packages dist/* --verbose
+        echo "✅ Successfully published to Azure Artifacts production"
     
     # Create GitHub Release (only from main branch)
     - name: Create GitHub Release
@@ -283,6 +315,11 @@ jobs:
         
         ## 📦 Installation
         \`\`\`bash
+        # Configure pip for Azure Artifacts
+        pip config set global.index-url https://pkgs.dev.azure.com/ppokrovskii/resume_match_pro_v2/_packaging/python_packages/pypi/simple/
+        pip config set global.extra-index-url https://pypi.org/simple/
+        
+        # Install the package (requires Azure DevOps authentication)
         pip install resume-match-shared-models==${version}
         \`\`\`
         
@@ -302,11 +339,16 @@ jobs:
         version=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")
         echo "## 🚀 Deployment Summary" >> $GITHUB_STEP_SUMMARY
         echo "- 📦 Version: ${version}" >> $GITHUB_STEP_SUMMARY
-        echo "- 🧪 Test PyPI: ✅ Published" >> $GITHUB_STEP_SUMMARY
-        if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
-          echo "- 🏭 Production PyPI: ✅ Published" >> $GITHUB_STEP_SUMMARY
+        
+        if [[ "${{ github.ref }}" == "refs/heads/develop" || "${{ github.ref }}" == "refs/heads/dev" ]]; then
+          echo "- 🧪 Azure Artifacts (Staging): ✅ Published" >> $GITHUB_STEP_SUMMARY
+          echo "- 🏭 Azure Artifacts (Production): ⏸️ Skipped (not main branch)" >> $GITHUB_STEP_SUMMARY
+        elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+          echo "- 🧪 Azure Artifacts (Staging): ⏸️ Skipped (main branch)" >> $GITHUB_STEP_SUMMARY
+          echo "- 🏭 Azure Artifacts (Production): ✅ Published" >> $GITHUB_STEP_SUMMARY
           echo "- 🏷️ GitHub Release: ✅ Created" >> $GITHUB_STEP_SUMMARY
         else
-          echo "- 🏭 Production PyPI: ⏸️ Skipped (not main branch)" >> $GITHUB_STEP_SUMMARY
-          echo "- 🏷️ GitHub Release: ⏸️ Skipped (not main branch)" >> $GITHUB_STEP_SUMMARY
+          echo "- 🧪 Azure Artifacts (Staging): ⏸️ Skipped" >> $GITHUB_STEP_SUMMARY
+          echo "- 🏭 Azure Artifacts (Production): ⏸️ Skipped" >> $GITHUB_STEP_SUMMARY
+          echo "- 🏷️ GitHub Release: ⏸️ Skipped" >> $GITHUB_STEP_SUMMARY
         fi
